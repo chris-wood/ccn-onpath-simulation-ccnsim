@@ -117,6 +117,14 @@ CCNxBuffer::End ()
   return m_data.End ();
 }
 
+std::string
+CCNxBuffer::Serialize() const
+{
+    char *buffer = new char[32];
+    m_data.Serialize((uint8_t *) buffer, 32);
+    return std::string(buffer);
+}
+
 bool
 CCNxBuffer::Equals (const Ptr<CCNxBuffer> other) const
 {

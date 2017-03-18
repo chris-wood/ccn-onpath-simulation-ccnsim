@@ -120,9 +120,9 @@ CCNxStandardForwarder::GetTypeId ()
                    MakeObjectFactoryAccessor (&CCNxStandardForwarder::m_fibFactory),
                    MakeObjectFactoryChecker ())
    .AddAttribute ("ContentStoreFactory", "The type of Content Store to use.",
-		   ObjectFactoryValue (GetDefaultContentStoreFactory ()),
-		   MakeObjectFactoryAccessor (&CCNxStandardForwarder::m_contentStoreFactory),
-		   MakeObjectFactoryChecker ())
+       ObjectFactoryValue (GetDefaultContentStoreFactory ()),
+       MakeObjectFactoryAccessor (&CCNxStandardForwarder::m_contentStoreFactory),
+       MakeObjectFactoryChecker ())
    .AddAttribute ("LayerDelayConstant", "The amount of constant layer delay",
                    TimeValue (_defaultLayerDelayConstant),
                    MakeTimeAccessor (&CCNxStandardForwarder::m_layerDelayConstant),
@@ -211,15 +211,15 @@ CCNxStandardForwarder::ServiceInputQueue (Ptr<CCNxStandardForwarderWorkItem> ite
     {
     case CCNxFixedHeaderType_Interest:
       {
-	m_forwarderStats.interestsToPit++;
-	NS_LOG_DEBUG("INTEREST: sending to PIT.  name="<< *item->GetPacket()->GetMessage()->GetName());
+  m_forwarderStats.interestsToPit++;
+  NS_LOG_DEBUG("INTEREST: sending to PIT.  name="<< *item->GetPacket()->GetMessage()->GetName());
         m_pit->ReceiveInterest (item);
         break;
       }
     case CCNxFixedHeaderType_Object:
       {
-	m_forwarderStats.contentObjectsToPit++;
-	NS_LOG_DEBUG("CONTENT: sending to PIT.  name="<< *item->GetPacket()->GetMessage()->GetName());
+  m_forwarderStats.contentObjectsToPit++;
+  NS_LOG_DEBUG("CONTENT: sending to PIT.  name="<< *item->GetPacket()->GetMessage()->GetName());
         m_pit->SatisfyInterest (item);
         break;
       }
@@ -269,18 +269,18 @@ CCNxStandardForwarder::FinishRouteLookup (Ptr<CCNxStandardForwarderWorkItem> ite
     {
       std::string sourceConnString;
       if (item->GetIngressConnection())
-	{
-	  sourceConnString = static_cast<std::ostringstream*>( &(std::ostringstream() << item->GetIngressConnection()->GetConnectionId()) )->str();
-	}
+  {
+    sourceConnString = static_cast<std::ostringstream*>( &(std::ostringstream() << item->GetIngressConnection()->GetConnectionId()) )->str();
+  }
       else
-	{
-	  sourceConnString = "ContentStore";
-	}
+  {
+    sourceConnString = "ContentStore";
+  }
       NS_LOG_DEBUG ("packet=" << *item->GetPacket () << ", from " << sourceConnString << ", will be fwded to " << egressConnections->size () << " destinations.");
       if (egressConnections->size ())
-	{
-	  NS_LOG_DEBUG ("first destination is " << egressConnections->front ()->GetConnectionId () );
-	}
+  {
+    NS_LOG_DEBUG ("first destination is " << egressConnections->front ()->GetConnectionId () );
+  }
     }
 
   m_routeCallback (item->GetPacket (), item->GetIngressConnection (), item->GetRouteError (), egressConnections);
@@ -320,19 +320,19 @@ CCNxStandardForwarder::PitReceiveInterestCallback (Ptr<CCNxForwarderMessage> mes
     {
       m_forwarderStats.interestsVerdictForward++;
       if (m_contentStore)
-	{
-	      NS_LOG_DEBUG ("INTEREST:Verdict=" << verdict << ".  Starting check for match in content store.");
-	      m_forwarderStats.interestsToContentStore++;
-	      // start next asynchronous call
-	      m_contentStore->MatchInterest (message);
-	}
+  {
+        NS_LOG_DEBUG ("INTEREST:Verdict=" << verdict << ".  Starting check for match in content store.");
+        m_forwarderStats.interestsToContentStore++;
+        // start next asynchronous call
+        m_contentStore->MatchInterest (message);
+  }
       else
-	{
-	      NS_LOG_DEBUG ("INTEREST:Verdict=" << verdict << ".  Starting FIB lookup");
-	      // start next asynchronous call
-	      m_forwarderStats.interestsToFib++;
-	      m_fib->Lookup (message);
-	}
+  {
+        NS_LOG_DEBUG ("INTEREST:Verdict=" << verdict << ".  Starting FIB lookup");
+        // start next asynchronous call
+        m_forwarderStats.interestsToFib++;
+        m_fib->Lookup (message);
+  }
     }
   else //verdict == Aggregate, discard interest
     {
@@ -355,33 +355,41 @@ CCNxStandardForwarder::PitSatisfyInterestCallback (Ptr<CCNxForwarderMessage> mes
       {
       m_forwarderStats.contentObjectsMatchedInPit++;
       if  (m_contentStore and item->GetIngressConnection())
-	{ // there is a CS and this content is not from the CS, so try to add this content
+        { // there is a CS and this content is not from the CS, so try to add this content
 
-	  m_forwarderStats.contentObjectsToContentStore++;
-	  NS_LOG_DEBUG ("CONTENT:name=" << *message->GetPacket()->GetMessage()->GetName() <<" matched Pit Entry  - starting add to Content Store. 1st egressConn=" << egressConnections->front()->GetConnectionId());
-	  m_contentStore->AddContentObject(message,egressConnections); //will fwd packet after this, so must retain egressConnections
-	}
-      else
-	{  //match but no content store or this content came from the content store - fwd packet
-	  std::string logString;
-	      if (item->GetIngressConnection())
-		{
-		  logString = "CONTENT: match but no content store, finishing route lookup.";
-		}
-	      else
-		{
-		  logString = "CONTENT: match on content from content store - finishing route lookup.";
-		}
-	  NS_LOG_DEBUG(logString);
-	  FinishRouteLookup (item, egressConnections);
-	}
+          m_forwarderStats.contentObjectsToContentStore++;
+          NS_LOG_DEBUG ("CONTENT:name=" << *message->GetPacket()->GetMessage()->GetName() <<" matched Pit Entry  - starting add to Content Store. 1st egressConn=" << egressConnections->front()->GetConnectionId());
+          m_contentStore->AddContentObject(message,egressConnections); //will fwd packet after this, so must retain egressConnections
+        }
+        else
+        {  //match but no content store or this content came from the content store - fwd packet
+          std::string logString;
+          if (item->GetIngressConnection())
+          {
+            logString = "CONTENT: match but no content store, finishing route lookup.";
+          }
+          else
+          {
+            logString = "CONTENT: match on content from content store - finishing route lookup.";
+          }
+
+          NS_LOG_DEBUG(logString);
+          Ptr<CCNxPacket> packet = message->GetPacket();
+          if (ProcessPacketMAC(packet)) {
+              NS_LOG_DEBUG("MAC verified correctly -- forwarding");
+              FinishRouteLookup (item, egressConnections);
+          } else {
+              NS_LOG_DEBUG("MAC verified correctly -- dropping");
+          }
+
+        }
       }
-  else
-    { //no match - drop pkt
-      m_forwarderStats.contentObjectsNotMatchedInPit++;
-      NS_LOG_ERROR ("CONTENT: no matching Pit Entry! discarding packet="<< *message->GetPacket());
+      else
+      { //no match - drop pkt
+        m_forwarderStats.contentObjectsNotMatchedInPit++;
+        NS_LOG_ERROR ("CONTENT: no matching Pit Entry! discarding packet="<< *message->GetPacket());
 //      FinishRouteLookup (item, Ptr<CCNxConnectionList>(0)); no packet to forward
-    }
+      }
 
 }
 
@@ -416,7 +424,7 @@ CCNxStandardForwarder::ContentStoreMatchInterestCallback (Ptr<CCNxForwarderMessa
       //Replace interest packet with content packet, set ingressConnection to Null and send back to pit
       NS_LOG_DEBUG ("INTEREST sent to content store, found match.  Sending Content back to pit.");
       Ptr<CCNxStandardForwarderWorkItem> newWorkItem =
-	  Create<CCNxStandardForwarderWorkItem> (workItem->GetContentStorePacket(),Ptr<CCNxConnection>(0),Ptr<CCNxConnection>(0));
+    Create<CCNxStandardForwarderWorkItem> (workItem->GetContentStorePacket(),Ptr<CCNxConnection>(0),Ptr<CCNxConnection>(0));
       m_forwarderStats.contentObjectsToPit++;
       m_pit->SatisfyInterest (newWorkItem);
     }

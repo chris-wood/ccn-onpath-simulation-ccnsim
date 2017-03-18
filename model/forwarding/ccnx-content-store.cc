@@ -77,4 +77,3 @@ CCNxContentStore::CCNxContentStore ()
 CCNxContentStore::~CCNxContentStore ()
 {
 }
-

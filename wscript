@@ -75,6 +75,7 @@ def isNotNone(x):
 
 def build(bld):
     module = bld.create_ns3_module('ccns3Sim', ['core', 'network', 'virtual-net-device'])
+    module.env.append_value("LIB", ["cryptopp"])
     module.includes = '.'
     module.source = [
         'applications/ccnx-application.cc',
@@ -94,6 +95,7 @@ def build(bld):
         'model/messages/ccnx-name-builder.cc',
         'model/messages/ccnx-namesegment.cc',
         'model/messages/ccnx-time.cc',
+        'model/messages/ccnx-packetmac.cc',
         'model/messages/ccnx-perhopheaderentry.cc',
         'model/messages/ccnx-cachetime.cc',
         'model/messages/ccnx-interestlifetime.cc',
@@ -220,6 +222,7 @@ def build(bld):
         'model/messages/ccnx-interestlifetime.h',
         'model/messages/ccnx-cachetime.h',
         'model/messages/ccnx-perhopheader.h',
+        'model/messages/ccnx-packetmac.h',
         'model/messages/ccnx-interest.h',
         'model/messages/ccnx-message.h',
         'model/messages/ccnx-name.h',

@@ -58,6 +58,11 @@
 #include "ccnx-forwarder.h"
 #include "ns3/ccnx-l3-protocol.h"
 
+#include <model/messages/ccnx-packetmac.h>
+#include <model/messages/ccnx-buffer.h>
+#include <model/packets/ccnx-packet.h>
+#include <model/packets/standard/ccnx-schema-v1.h>
+
 using namespace ns3;
 using namespace ns3::ccnx;
 
@@ -71,6 +76,112 @@ static void
 NullRouteCallback (Ptr<CCNxPacket>, Ptr<CCNxConnection>, enum CCNxRoutingError::RoutingErrno, Ptr<CCNxConnectionList>)
 {
   NS_ASSERT_MSG (false, "You must set the Route Callback via SetRouteCallback()");
+}
+
+bool
+CCNxForwarder :: ProcessPacketMAC (Ptr<CCNxPacket> packet) const
+{
+    // extract the PacketMAC in the per-hop-header
+    Ptr<CCNxPerHopHeader> header = packet->GetPerhopHeaders();
+
+    // pull out the PacketMACs
+    for (size_t i = 0; i < header->size(); i++) {
+        Ptr<CCNxPerHopHeaderEntry> entry = header->GetHeader(i);
+
+        if (entry->GetInstanceTLVType() == CCNxSchemaV1::T_PACKET_MAC) {
+            // GetTLVType
+            Ptr<CCNxPacketMAC> macEntry = entry->GetObject<CCNxPacketMAC>();
+            for (size_t j = 0; j < macEntry->GetMACCount(); j++) {
+
+                // Extract the MAC info from the head of the list
+                Ptr<CCNxMACList> list = macEntry->GetMACList(j);
+                Ptr<CCNxMAC> mac = list->GetMACAtIndex(0);
+                int macID = mac->GetID();
+                Ptr<CCNxBuffer> macBuffer = mac->GetMAC();
+
+                // Attempt to verify it
+                if (false == this->VerifySinglePacketMAC(packet, macID, macBuffer)) {
+                    return false;
+                }
+
+                // If the MAC was valid, then drop the first one
+                list->DropMACAtIndex(0);
+                if (list->Size() == 0) {
+                    macEntry->DropMACList(j);
+                }
+            }
+
+            // XXX: once we get here, we need to compute our own set of packet MACs
+        }
+    }
+
+    return true;
+}
+
+static std::string
+packetToString(Ptr<CCNxPacket> packet)
+{
+    Ptr<CCNxMessage> message = packet->GetMessage();
+    std::ostringstream stream;
+    stream << *message;
+    std::string plain = stream.str();
+    return plain;
+}
+
+bool
+CCNxForwarder :: VerifySinglePacketMAC (Ptr<CCNxPacket> packet, int keyId, Ptr<CCNxBuffer> macBuffer) const
+{
+    if (m_integrityKeys.find(keyId) == m_integrityKeys.end()) {
+        return false;
+    }
+
+    std::string MAC = macBuffer->Serialize();
+
+    SecByteBlock key = m_integrityKeys.find(keyId)->second;
+    try {
+        HMAC<SHA256> hmac(key, key.size());
+        const int flags = HashVerificationFilter::THROW_EXCEPTION | HashVerificationFilter::HASH_AT_END;
+        std::string plain = packetToString(packet);
+        StringSource(plain + MAC, true,
+            new HashVerificationFilter(hmac, NULL, flags)
+        );
+
+        return true; // if we get here, it verified correctly
+    } catch (const CryptoPP::Exception& e) {
+        return false;
+    }
+
+    // won't get here
+    return false;
+}
+
+Ptr<CCNxBuffer>
+CCNxForwarder :: ComputePacketMAC (Ptr<CCNxPacket> packet, int keyId) const
+{
+    if (m_integrityKeys.find(keyId) == m_integrityKeys.end()) {
+        return NULL;
+    }
+
+    SecByteBlock key = m_integrityKeys.find(keyId)->second;
+    std::string mac, encoded;
+
+    try {
+        HMAC<SHA256> hmac(key, key.size());
+        std::string plain = packetToString(packet);
+        StringSource ss2(plain, true,
+            new HashFilter(hmac,
+                new StringSink(mac)
+            )
+        );
+    } catch (const CryptoPP::Exception& e) {
+        return NULL;
+    }
+
+    // Wrap the MAC up in a CCNxBuffer
+    int length = mac.size();
+    char *data = (char *) mac.c_str();
+    Ptr<CCNxBuffer> buffer = Create<CCNxBuffer>(length, data);
+    return buffer;
 }
 
 TypeId

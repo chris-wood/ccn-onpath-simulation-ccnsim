@@ -53,71 +53,173 @@
  * contact PARC at cipo@parc.com for more information or visit http://www.ccnx.org
  */
 
-#ifndef CCNS3SIM_CCNXSCHEMAV1_H
-#define CCNS3SIM_CCNXSCHEMAV1_H
+#include "ns3/log.h"
+#include "ccnx-packetmac.h"
+#include "ns3/ccnx-perhopheaderentry.h"
 
-#include <stdint.h>
+#include "ns3/ccnx-tlv.h"
+#include "ns3/ccnx-schema-v1.h"
 
-namespace ns3 {
-namespace ccnx {
+using namespace ns3;
+using namespace ns3::ccnx;
 
-/**
- * @ingroup ccnx-packet
- *
- * This class defines the TLV Type values for the V1 schema.
- *
- * These values come from the ICNRG research group document irtf-icnrg-ccnx-messages-01.txt.
- */
-class CCNxSchemaV1
+NS_LOG_COMPONENT_DEFINE ("CCNxPacketMAC");
+
+NS_OBJECT_ENSURE_REGISTERED(CCNxPacketMAC);
+
+const uint32_t CCNxPacketMAC::m_packetMACTLVType = 0x0004;
+
+//// CCNxMAC
+
+CCNxMAC::CCNxMAC (int id, Ptr<CCNxBuffer> buffer)
 {
-public:
-  // hop-by-hop headers
-  static const uint16_t T_INT_LIFE = 0x0001;
-  static const uint16_t T_CACHE_TIME = 0x0002;
-  static const uint16_t T_MSG_HASH = 0x0003;
-  static const uint16_t T_PACKET_MAC = 0x0004;
-
-  // top-level TLVs
-  static const uint16_t T_INTEREST = 0x0001;
-  static const uint16_t T_OBJECT = 0x0002;
-  static const uint16_t T_VALALG = 0x0003;
-  static const uint16_t T_VALSIG = 0x0004;
-
-  // Message body
-  static const uint16_t T_NAME = 0x0000;
-  static const uint16_t T_PAYLOAD = 0x0001;
-  static const uint16_t T_KEYID_REST = 0x0002;
-  static const uint16_t T_HASH_REST = 0x0003;
-  static const uint16_t T_PAYLDTYPE = 0x0005;
-  static const uint16_t T_EXPIRY = 0x0006;
-
-  // name segments
-  static const uint16_t T_NAMESEG_NAME = 0x0001;
-  static const uint16_t T_NAMESEG_IPID = 0x0002;
-  static const uint16_t T_NAMESEG_CHUNK = 0x0010;
-  static const uint16_t T_NAMESEG_VERSION = 0x0013;
-
-  static const uint16_t T_NAMESEG_APP0 = 0x1000;
-  static const uint16_t T_NAMESEG_APP1 = 0x1001;
-  static const uint16_t T_NAMESEG_APP2 = 0x1002;
-  static const uint16_t T_NAMESEG_APP3 = 0x1003;
-  static const uint16_t T_NAMESEG_APP4 = 0x1004;
-
-  // Payload type
-  static const uint8_t T_PAYLOADTYPE_DATA = 0x00;
-  static const uint8_t T_PAYLOADTYPE_KEY = 0x01;
-  static const uint8_t T_PAYLOADTYPE_LINK = 0x02;
-  static const uint8_t T_PAYLOADTYPE_MANIFEST = 0x3;
-
-  // Validation fields
-  static const uint16_t T_CRC32C = 0x0002;
-  static const uint16_t T_HMAC_SHA256 = 0x0003;
-  static const uint16_t T_RSA_SHA256 = 0x0006;
-
-  static const uint16_t T_KEYID = 0x0009;
-  static const uint16_t T_PUBLICKEY = 0x000B;
-  static const uint16_t T_SIGTIME = 0x000F;
-};
+    m_id = id;
+    m_bytes = buffer;
 }
+
+CCNxMAC::~CCNxMAC ()
+{
+    // delete (m_bytes);
 }
-#endif //CCNS3SIM_CCNXSCHEMAV1_H
+
+int
+CCNxMAC :: GetID(void) const
+{
+    return m_id;
+}
+
+Ptr<CCNxBuffer>
+CCNxMAC :: GetMAC(void) const
+{
+    return m_bytes;
+}
+
+//// CCNxMACList
+
+CCNxMACList::CCNxMACList()
+{
+}
+CCNxMACList::~CCNxMACList()
+{
+}
+
+void
+CCNxMACList::AppendMAC(Ptr<CCNxMAC> mac)
+{
+    m_macs.push_back(mac);
+}
+
+void
+CCNxMACList::DropMACAtIndex(int index)
+{
+    m_macs.erase(m_macs.begin() + index, m_macs.begin() + index + 1);
+}
+
+int
+CCNxMACList::Size() const
+{
+    return m_macs.size();
+}
+
+Ptr<CCNxMAC>
+CCNxMACList::GetMACAtIndex(int index) const
+{
+    return m_macs.at(index);
+}
+
+//// meat and potatoes
+
+TypeId
+CCNxPacketMAC::GetTypeId (void)
+{
+  static TypeId tid = TypeId ("ns3::ccnx::CCNxPacketMAC")
+    .SetParent<CCNxPerHopHeaderEntry> ()
+    .SetGroupName ("CCNx");
+  return tid;
+}
+
+TypeId
+CCNxPacketMAC::GetInstanceTypeId (void) const
+{
+  return GetTypeId ();
+}
+
+CCNxPacketMAC :: CCNxPacketMAC (std::vector< Ptr<CCNxMACList> > macs)
+{
+    for (std::vector<Ptr<CCNxMACList> >::iterator itr = macs.begin(); itr != macs.end(); itr++) {
+        m_packetMACs.push_back(*itr);
+    }
+}
+
+CCNxPacketMAC::~CCNxPacketMAC ()
+{
+  // empty
+}
+
+uint16_t
+CCNxPacketMAC :: GetTLVType(void)
+{
+  return m_packetMACTLVType;
+}
+
+uint16_t
+CCNxPacketMAC :: GetInstanceTLVType (void) const
+{
+  return GetTLVType ();
+}
+
+size_t
+CCNxPacketMAC :: GetMACCount (void) const
+{
+  return m_packetMACs.size();
+}
+
+Ptr<CCNxMACList>
+CCNxPacketMAC :: GetMACList (size_t i) const
+{
+  return m_packetMACs.at(i);
+}
+
+void
+CCNxPacketMAC :: DropMACList (size_t i)
+{
+    m_packetMACs.erase(m_packetMACs.begin() + i, m_packetMACs.begin() + i + 1);
+}
+
+std::vector<Ptr<CCNxMACList> >
+CCNxPacketMAC :: GetMACs(void) const
+{
+  return m_packetMACs;
+}
+
+bool
+CCNxPacketMAC::Equals (const Ptr<CCNxPerHopHeaderEntry> other) const
+{
+  if (other)
+    {
+      return Equals (*other);
+    }
+  else
+    {
+      return false;
+    }
+}
+
+bool
+CCNxPacketMAC::Equals (CCNxPerHopHeaderEntry const &other) const
+{
+  bool result = false;
+  const CCNxPacketMAC *ptr = dynamic_cast<const CCNxPacketMAC *>(&other);
+  if (m_packetMACs == ptr->GetMACs())
+  {
+    result = true;
+  }
+  return result;
+}
+
+std::ostream &
+CCNxPacketMAC::Print(std::ostream &os) const
+{
+  os << "{ PacketMACS {...} }";
+  return os;
+}

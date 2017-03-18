@@ -92,6 +92,14 @@ CCNxPerHopHeader::GetHeader(size_t index) const
 }
 
 void
+CCNxPerHopHeader::DropHeader(size_t index)
+{
+    if (index > 0 && index < m_perhopheaders.size()) {
+        m_perhopheaders.erase(m_perhopheaders.begin() + index, m_perhopheaders.begin() + index + 1);
+    }
+}
+
+void
 CCNxPerHopHeader::RemoveHeader(size_t index)
 {
   m_perhopheaders.erase (m_perhopheaders.begin() + index);

@@ -112,6 +112,8 @@ public:
 
   Buffer::Iterator End ();
 
+  std::string Serialize() const;
+
   /**
    * Test if this Buffer is the same as the other Buffer.
    *

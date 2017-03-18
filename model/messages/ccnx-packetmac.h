@@ -53,71 +53,126 @@
  * contact PARC at cipo@parc.com for more information or visit http://www.ccnx.org
  */
 
-#ifndef CCNS3SIM_CCNXSCHEMAV1_H
-#define CCNS3SIM_CCNXSCHEMAV1_H
+#ifndef CCNS3_CCNxPacketMAC_H
+#define CCNS3_CCNxPacketMAC_H
 
-#include <stdint.h>
+#include "ns3/object.h"
+#include "ns3/ccnx-perhopheaderentry.h"
+#include "ns3/ccnx-time.h"
+#include "ccnx-buffer.h"
 
-namespace ns3 {
+namespace ns3  {
 namespace ccnx {
 
-/**
- * @ingroup ccnx-packet
- *
- * This class defines the TLV Type values for the V1 schema.
- *
- * These values come from the ICNRG research group document irtf-icnrg-ccnx-messages-01.txt.
- */
-class CCNxSchemaV1
-{
+class CCNxMAC : public Object {
 public:
-  // hop-by-hop headers
-  static const uint16_t T_INT_LIFE = 0x0001;
-  static const uint16_t T_CACHE_TIME = 0x0002;
-  static const uint16_t T_MSG_HASH = 0x0003;
-  static const uint16_t T_PACKET_MAC = 0x0004;
+    CCNxMAC (int id, Ptr<CCNxBuffer> buffer);
+    virtual ~CCNxMAC ();
 
-  // top-level TLVs
-  static const uint16_t T_INTEREST = 0x0001;
-  static const uint16_t T_OBJECT = 0x0002;
-  static const uint16_t T_VALALG = 0x0003;
-  static const uint16_t T_VALSIG = 0x0004;
-
-  // Message body
-  static const uint16_t T_NAME = 0x0000;
-  static const uint16_t T_PAYLOAD = 0x0001;
-  static const uint16_t T_KEYID_REST = 0x0002;
-  static const uint16_t T_HASH_REST = 0x0003;
-  static const uint16_t T_PAYLDTYPE = 0x0005;
-  static const uint16_t T_EXPIRY = 0x0006;
-
-  // name segments
-  static const uint16_t T_NAMESEG_NAME = 0x0001;
-  static const uint16_t T_NAMESEG_IPID = 0x0002;
-  static const uint16_t T_NAMESEG_CHUNK = 0x0010;
-  static const uint16_t T_NAMESEG_VERSION = 0x0013;
-
-  static const uint16_t T_NAMESEG_APP0 = 0x1000;
-  static const uint16_t T_NAMESEG_APP1 = 0x1001;
-  static const uint16_t T_NAMESEG_APP2 = 0x1002;
-  static const uint16_t T_NAMESEG_APP3 = 0x1003;
-  static const uint16_t T_NAMESEG_APP4 = 0x1004;
-
-  // Payload type
-  static const uint8_t T_PAYLOADTYPE_DATA = 0x00;
-  static const uint8_t T_PAYLOADTYPE_KEY = 0x01;
-  static const uint8_t T_PAYLOADTYPE_LINK = 0x02;
-  static const uint8_t T_PAYLOADTYPE_MANIFEST = 0x3;
-
-  // Validation fields
-  static const uint16_t T_CRC32C = 0x0002;
-  static const uint16_t T_HMAC_SHA256 = 0x0003;
-  static const uint16_t T_RSA_SHA256 = 0x0006;
-
-  static const uint16_t T_KEYID = 0x0009;
-  static const uint16_t T_PUBLICKEY = 0x000B;
-  static const uint16_t T_SIGTIME = 0x000F;
+    Ptr<CCNxBuffer> GetMAC(void) const;
+    int GetID(void) const;
+private:
+    int m_id;
+    Ptr<CCNxBuffer> m_bytes;
 };
+
+class CCNxMACList : public Object {
+public:
+    CCNxMACList ();
+    virtual ~CCNxMACList ();
+
+    void AppendMAC(Ptr<CCNxMAC> mac);
+    void DropMACAtIndex(int index);
+    Ptr<CCNxMAC> GetMACAtIndex(int index) const;
+    int Size() const;
+private:
+    std::vector< Ptr<CCNxMAC> > m_macs;
+};
+
+
+/**
+ * @ingroup ccnx-messages
+ *
+ * Class representation of InterestLifetime Per Hop Header Entry.
+ */
+class CCNxPacketMAC : public CCNxPerHopHeaderEntry {
+public:
+  static TypeId GetTypeId (void);
+
+  virtual TypeId GetInstanceTypeId (void) const;
+
+  /**
+   * Constructor for CCNxPacketMAC.
+   *
+   */
+  CCNxPacketMAC (std::vector< Ptr<CCNxMACList> > macs);
+
+  /**
+   * Destructor for CCNxPacketMAC
+   */
+  virtual ~CCNxPacketMAC ();
+
+  /**
+   * Returns the Per Hop Header Type ( = 6) for Packet MAC
+   */
+  static uint16_t GetTLVType(void);
+
+  virtual uint16_t GetInstanceTLVType (void) const;
+
+  /**
+   * Determines if the given InterestLifetime is equivalent to this InterestLifetime.
+   *
+   * Two InterestLifetimes are equivalent if the time values are exactly equal
+   */
+  bool Equals (const Ptr<CCNxPerHopHeaderEntry> other) const;
+
+  /**
+   * Determines if the given InterestLifetime is equivalent to this InterestLifetime.
+   *
+   * Two InterestLifetimes are equivalent if time values are exactly equal
+   */
+  bool Equals (CCNxPerHopHeaderEntry const &other) const;
+
+  /**
+   * Get the number of MACs in this PacketMAC
+   */
+  size_t GetMACCount () const;
+
+  /**
+   * Retrieve the i-th MAC from this packet.
+   */
+  Ptr<CCNxMACList> GetMACList (size_t i) const;
+
+  /**
+   * Drop the i-th MAC from this packet.
+   */
+  void DropMACList (size_t i);
+
+  /**
+   * Retrieve the vector of MACs in this entry.
+   */
+  std::vector<Ptr<CCNxMACList> > GetMACs (void) const;
+
+  /**
+   * Prints a string like this:
+   *
+   * { Interest Lifetime timeValue T }
+   *
+   * Where T is the uint64_t value of the CCNxTime.
+   *
+   * @param [in] os ostream object
+   * @return ostream object
+   */
+
+   virtual std::ostream & Print(std::ostream &os) const;
+
+protected:
+
+  static const uint32_t m_packetMACTLVType;
+  std::vector<Ptr<CCNxMACList> > m_packetMACs;
+};
+
 }
 }
-#endif //CCNS3SIM_CCNXSCHEMAV1_H
+
+#endif //CCNS3_CCNXHEADERS_H

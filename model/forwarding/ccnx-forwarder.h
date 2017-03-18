@@ -68,6 +68,35 @@
 #include "ns3/ccnx-connection-list.h"
 #include "ns3/output-stream-wrapper.h"
 
+#include <cryptopp/asn.h>
+#include <cryptopp/base64.h>
+#include <cryptopp/des.h>
+#include <cryptopp/files.h>
+#include <cryptopp/filters.h>
+#include <cryptopp/hex.h>
+#include <cryptopp/modes.h>
+#include <cryptopp/osrng.h>
+#include <cryptopp/pssr.h>
+#include <cryptopp/pwdbased.h>
+#include <cryptopp/rsa.h>
+#include <cryptopp/sha.h>
+#include <cryptopp/eccrypto.h>
+#include <cryptopp/oids.h>
+#include <cryptopp/dsa.h>
+
+using CryptoPP::Exception;
+using CryptoPP::HMAC;
+using CryptoPP::SHA256;
+using CryptoPP::HexEncoder;
+using CryptoPP::HexDecoder;
+using CryptoPP::StringSink;
+using CryptoPP::StringSource;
+using CryptoPP::HashFilter;
+using CryptoPP::HashVerificationFilter;
+using CryptoPP::SecByteBlock;
+
+#include <map>
+
 namespace ns3 {
 namespace ccnx {
 
@@ -235,6 +264,21 @@ public:
    * Will also set m_ccnx by looking up type TypeId "ns3::ccnx::CCNxL3Protocol".
    */
   void SetNode (Ptr<Node> node);
+
+
+  bool ProcessPacketMAC(Ptr<CCNxPacket> packet) const;
+  Ptr<CCNxBuffer> ComputePacketMAC(Ptr<CCNxPacket> packet, int keyId) const;
+  bool VerifySinglePacketMAC(Ptr<CCNxPacket> packet, int keyId, Ptr<CCNxBuffer> macBuffer) const;
+
+  /*
+   * Integrity radius keys
+   */
+  std::map<int, SecByteBlock> m_integrityKeys;
+
+  /*
+   * Local identity and secret key
+   */
+  int m_id;
 
 protected:
 

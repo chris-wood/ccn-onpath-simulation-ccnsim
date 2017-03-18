@@ -95,6 +95,11 @@ CreatePacket (uint32_t size, Ptr<CCNxName> name, CCNxMessage::MessageType msgTyp
       {
         Ptr<CCNxContentObject> content = Create<CCNxContentObject> (name, payload);
         packet = CCNxPacket::CreateFromMessage (content);
+
+
+        /// XXX: need to create the packet MAC list
+        // Ptr<CCNxPacketMAC> packetMAC = Create<CCNxPacketMAC> ();
+        // packet->AddPerHopHeaderEntry(packetMAC);
         break;
       }
     case  CCNxMessage::Interest:
@@ -192,6 +197,7 @@ RunSimulation (void)
   Ptr<NetDevice> node0If0 = node0->GetDevice (0);
   Ptr<NetDevice> node1If0 = node1->GetDevice (0);
 
+  Ptr<CCNxL3Protocol> node0_ccnx = node0->GetObject<CCNxL3Protocol> ();
   Ptr<CCNxL3Protocol> node1_ccnx = node1->GetObject<CCNxL3Protocol> ();
 
   // Tell the forwarder on node 1 that node0 if0's MAC address is reachable via node1 if 0.
@@ -202,6 +208,24 @@ RunSimulation (void)
   Ptr<CCNxName> prefixName = Create<CCNxName> (prefixString);
 
   node1_ccnx->GetForwarder ()->AddRoute (node1ToNode0Connection, prefixName);
+
+  //////
+  // key establishment
+
+  // Generate the shared keys
+  CryptoPP::AutoSeededRandomPool prng;
+  CryptoPP::SecByteBlock key(16);
+  prng.GenerateBlock(key, key.size());
+
+  // Add the keys to the forwarders
+  Ptr<CCNxForwarder> f0 = node0_ccnx->GetForwarder();
+  f0->m_integrityKeys[1] = key;
+  f0->m_integrityKeys[0] = key;
+  Ptr<CCNxForwarder> f1 = node1_ccnx->GetForwarder();
+  f1->m_integrityKeys[1] = key;
+  f1->m_integrityKeys[0] = key;
+
+  //// done
 
   // Now send packets and run simulation
 

@@ -106,6 +106,13 @@ public:
   Ptr<CCNxPerHopHeaderEntry> GetHeader(size_t index) const;
 
   /**
+   * Drops the CCNxPerHopHeaderEntry at the given index
+   *
+   * @param [in] index The index into the vector
+   */
+  void DropHeader(size_t index);
+
+  /**
    * Removes the CCNxPerHopHeaderEntry at the given index
    *
    * @param [in] The index from which CCNxPerHopHeaderEntry needs to be removed
