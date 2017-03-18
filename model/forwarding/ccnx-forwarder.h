@@ -256,8 +256,6 @@ public:
    */
   virtual void PrintForwardingStatistics (Ptr<OutputStreamWrapper> streamWrapper) const = 0;
 
-
-
   /**
    * Sets the node on which this forwarder sits.
    *
@@ -265,10 +263,16 @@ public:
    */
   void SetNode (Ptr<Node> node);
 
-
-  bool ProcessPacketMAC(Ptr<CCNxPacket> packet) const;
+  // TODO(cawood): add documentation
+  void AppendRouterTag(Ptr<CCNxPacket> packet) const;
+  bool PreProcessPacketMAC(Ptr<CCNxPacket> packet) const;
+  void PostProcessPacketMAC(Ptr<CCNxPacket> packet, std::vector<int> keyIds) const;
   Ptr<CCNxBuffer> ComputePacketMAC(Ptr<CCNxPacket> packet, int keyId) const;
   bool VerifySinglePacketMAC(Ptr<CCNxPacket> packet, int keyId, Ptr<CCNxBuffer> macBuffer) const;
+
+  void AddIntegrityKey(int id, SecByteBlock block);
+  void SetId(int id);
+  void SetRadiiSize(int size);
 
   /*
    * Integrity radius keys
@@ -276,9 +280,14 @@ public:
   std::map<int, SecByteBlock> m_integrityKeys;
 
   /*
-   * Local identity and secret key
+   * Local identity
    */
   int m_id;
+
+  /*
+   * Integrity radii size (k)
+   */
+  int m_raddiSize;
 
 protected:
 

@@ -181,6 +181,12 @@ CCNxPacketMAC :: GetMACList (size_t i) const
 }
 
 void
+CCNxPacketMAC :: AppendMACList (Ptr<CCNxMACList> macList)
+{
+    m_packetMACs.push_back(macList);
+}
+
+void
 CCNxPacketMAC :: DropMACList (size_t i)
 {
     m_packetMACs.erase(m_packetMACs.begin() + i, m_packetMACs.begin() + i + 1);
@@ -220,6 +226,8 @@ CCNxPacketMAC::Equals (CCNxPerHopHeaderEntry const &other) const
 std::ostream &
 CCNxPacketMAC::Print(std::ostream &os) const
 {
-  os << "{ PacketMACS {...} }";
+  os << "{ PacketMACS { ";
+  os << m_packetMACs.size();
+  os << " } }";
   return os;
 }

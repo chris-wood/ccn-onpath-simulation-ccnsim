@@ -245,6 +245,8 @@ CCNxStandardForwarder::ServiceInputQueue (Ptr<CCNxStandardForwarderWorkItem> ite
 void
 CCNxStandardForwarder::FinishRouteLookup (Ptr<CCNxStandardForwarderWorkItem> item, Ptr<CCNxConnectionList> egressConnections)
 {
+    // Log the packet
+    NS_LOG_DEBUG ("packet=" << *item->GetPacket ());
 
   m_forwarderStats.packetsOut++;
 
@@ -315,6 +317,8 @@ CCNxStandardForwarder::RouteInput (Ptr<CCNxPacket> packet,
 void
 CCNxStandardForwarder::PitReceiveInterestCallback (Ptr<CCNxForwarderMessage> message, enum CCNxPit::Verdict verdict)
 {
+    NS_LOG_DEBUG ("packet=" << *message->GetPacket ());
+
   NS_LOG_FUNCTION (message->GetPacket () << message->GetIngressConnection () << verdict);
   if (verdict == CCNxPit::Forward)
     {
@@ -328,6 +332,10 @@ CCNxStandardForwarder::PitReceiveInterestCallback (Ptr<CCNxForwarderMessage> mes
   }
       else
   {
+
+      // Before forwarding, append our local router tag
+      this->AppendRouterTag(message->GetPacket());
+
         NS_LOG_DEBUG ("INTEREST:Verdict=" << verdict << ".  Starting FIB lookup");
         // start next asynchronous call
         m_forwarderStats.interestsToFib++;
@@ -344,7 +352,7 @@ CCNxStandardForwarder::PitReceiveInterestCallback (Ptr<CCNxForwarderMessage> mes
 }
 
 void
-CCNxStandardForwarder::PitSatisfyInterestCallback (Ptr<CCNxForwarderMessage> message, Ptr<CCNxConnectionList> egressConnections)
+CCNxStandardForwarder::PitSatisfyInterestCallback (Ptr<CCNxForwarderMessage> message, Ptr<CCNxConnectionList> egressConnections, std::vector<int> downstreamIds)
 {
   NS_LOG_FUNCTION (message->GetPacket () << message->GetIngressConnection () << egressConnections);
 
@@ -375,11 +383,12 @@ CCNxStandardForwarder::PitSatisfyInterestCallback (Ptr<CCNxForwarderMessage> mes
 
           NS_LOG_DEBUG(logString);
           Ptr<CCNxPacket> packet = message->GetPacket();
-          if (ProcessPacketMAC(packet)) {
-              NS_LOG_DEBUG("MAC verified correctly -- forwarding");
+          if (PreProcessPacketMAC(packet)) {
+              NS_LOG_DEBUG("MAC verified correctly -- appending new MACs");
+              PostProcessPacketMAC(packet, downstreamIds);
               FinishRouteLookup (item, egressConnections);
           } else {
-              NS_LOG_DEBUG("MAC verified correctly -- dropping");
+              NS_LOG_DEBUG("MAC verification failed -- dropping the packet");
           }
 
         }

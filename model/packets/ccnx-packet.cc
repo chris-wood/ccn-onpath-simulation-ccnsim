@@ -132,11 +132,7 @@ void CCNxPacket::DoDispose (void)
 Ptr<Packet>
 CCNxPacket::CreateNs3Packet ()
 {
-  if (m_ns3Packet == NULL)
-    {
-      m_ns3Packet = GenerateNs3Packet ();
-    }
-
+  m_ns3Packet = GenerateNs3Packet ();
   return m_ns3Packet->Copy ();
 }
 

@@ -61,6 +61,9 @@
 #include "ns3/integer.h"
 #include "ns3/ccnx-interestlifetime.h"
 
+#include <model/packets/standard/ccnx-schema-v1.h>
+#include <model/messages/ccnx-routertag.h>
+
 using namespace ns3;
 using namespace ns3::ccnx;
 
@@ -86,7 +89,7 @@ NullReceiveInterestCallback (Ptr<CCNxForwarderMessage>, enum CCNxPit::Verdict)
  * Used as a default callback for m_satisfyInterestCallback in case the user does not set it.
  */
 static void
-NullSatisfyInterestCallback (Ptr<CCNxForwarderMessage>, Ptr<CCNxConnectionList>)
+NullSatisfyInterestCallback (Ptr<CCNxForwarderMessage>, Ptr<CCNxConnectionList>, std::vector<int>)
 {
   NS_ASSERT_MSG (false, "You must set the SatisfyInterest Callback via SetSatisfyInterestCallback()");
 }
@@ -245,8 +248,25 @@ CCNxStandardPit::ServiceReceiveInterest (Ptr<CCNxForwarderMessage> item)
       NS_ASSERT_MSG ( (pitEntry), "Failed to add a PIT entry");
   }
 
+  // Get the router tags from the list
+  Ptr<CCNxPacket> packet = item->GetPacket();
+  Ptr<CCNxPerHopHeader> header = packet->GetPerhopHeaders();
+  std::vector<int> tags;
+  for (size_t i = 0; i < header->size(); i++) {
+      Ptr<CCNxPerHopHeaderEntry> entry = header->GetHeader(i);
+      if (entry->GetInstanceTLVType() == CCNxSchemaV1::T_ROUTER_TAG) { // GetTLVType
+          Ptr<CCNxRouterTags> tagBag = entry->GetObject<CCNxRouterTags>();
+
+          std::vector<int> otherTags = tagBag->GetTags();
+          for (int j = 0; j < otherTags.size(); j++) {
+              tags.push_back(otherTags.at(j));
+          }
+          break; // there is only one router tag TLV in the per-hop-header
+      }
+  }
+
   Time interestExpiryTime = CalculateInterestExpiryTime(item->GetPacket());
-  CCNxPit::Verdict verdict = pitEntry->ReceiveInterest(interest, item->GetIngressConnection(), interestExpiryTime);
+  CCNxPit::Verdict verdict = pitEntry->ReceiveInterest(interest, item->GetIngressConnection(), interestExpiryTime, tags);
 
   NS_LOG_DEBUG ("at end of ReceiveInterest - name,hash pit sizes =[" << m_tableByName.size () << "," << m_tableByHash.size () << "]");
   NS_LOG_DEBUG ("and the interestExpiryTime=" << interestExpiryTime.As(Time::MS) );
@@ -269,12 +289,15 @@ CCNxStandardPit::ServiceSatisfyInterest (Ptr<CCNxForwarderMessage> item)
    */
 
   CCNxStandardPitEntry::ReverseRouteType reverseRouteSet;
+  std::vector<int> tags;
 
+  // TODO(cawood): not yet implemented for hash-based requests
   if (contentObject->GetName()) {
       Ptr<CCNxStandardPitEntry> entry = LookupPitEntryByName (contentObject->GetName());
       if (entry) {
           CCNxStandardPitEntry::ReverseRouteType aSet = entry->SatisfyInterest(item->GetIngressConnection());
           reverseRouteSet.insert (aSet.begin(), aSet.end());
+          tags = entry->getTags();
 
           if (entry->size() == 0) {
               RemovePitEntryByName (contentObject->GetName ());
@@ -320,7 +343,7 @@ CCNxStandardPit::ServiceSatisfyInterest (Ptr<CCNxForwarderMessage> item)
       NS_LOG_DEBUG ( __func__ << " connId of first entry = " << satisfiedConnections->front ()->GetConnectionId () );
     }
 
-  m_satisfyInterestCallback (item, satisfiedConnections);
+  m_satisfyInterestCallback (item, satisfiedConnections, tags);
 }
 
 void
@@ -557,6 +580,3 @@ CCNxStandardPit::Print (std::ostream &os) const
   os << std::endl;
 
 }
-
-
-

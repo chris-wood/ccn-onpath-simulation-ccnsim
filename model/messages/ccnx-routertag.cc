@@ -53,131 +53,108 @@
  * contact PARC at cipo@parc.com for more information or visit http://www.ccnx.org
  */
 
-#ifndef CCNS3_CCNxPacketMAC_H
-#define CCNS3_CCNxPacketMAC_H
-
-#include "ns3/object.h"
+#include "ns3/log.h"
+#include "ccnx-routertag.h"
 #include "ns3/ccnx-perhopheaderentry.h"
-#include "ns3/ccnx-time.h"
-#include "ccnx-buffer.h"
 
-namespace ns3  {
-namespace ccnx {
+#include "ns3/ccnx-tlv.h"
+#include "ns3/ccnx-schema-v1.h"
 
-class CCNxMAC : public Object {
-public:
-    CCNxMAC (int id, Ptr<CCNxBuffer> buffer);
-    virtual ~CCNxMAC ();
+using namespace ns3;
+using namespace ns3::ccnx;
 
-    Ptr<CCNxBuffer> GetMAC(void) const;
-    int GetID(void) const;
-private:
-    int m_id;
-    Ptr<CCNxBuffer> m_bytes;
-};
+NS_LOG_COMPONENT_DEFINE ("CCNxRouterTags");
 
-class CCNxMACList : public Object {
-public:
-    CCNxMACList ();
-    virtual ~CCNxMACList ();
+NS_OBJECT_ENSURE_REGISTERED(CCNxRouterTags);
 
-    void AppendMAC(Ptr<CCNxMAC> mac);
-    void DropMACAtIndex(int index);
-    Ptr<CCNxMAC> GetMACAtIndex(int index) const;
-    int Size() const;
-private:
-    std::vector< Ptr<CCNxMAC> > m_macs;
-};
+const uint32_t CCNxRouterTags::m_routerTagTLVType = 0x0005;
 
-
-/**
- * @ingroup ccnx-messages
- *
- * Class representation of InterestLifetime Per Hop Header Entry.
- */
-class CCNxPacketMAC : public CCNxPerHopHeaderEntry {
-public:
-  static TypeId GetTypeId (void);
-
-  virtual TypeId GetInstanceTypeId (void) const;
-
-  /**
-   * Constructor for CCNxPacketMAC.
-   *
-   */
-  CCNxPacketMAC (std::vector< Ptr<CCNxMACList> > macs);
-
-  /**
-   * Destructor for CCNxPacketMAC
-   */
-  virtual ~CCNxPacketMAC ();
-
-  /**
-   * Returns the Per Hop Header Type ( = 6) for Packet MAC
-   */
-  static uint16_t GetTLVType(void);
-
-  virtual uint16_t GetInstanceTLVType (void) const;
-
-  /**
-   * Determines if the given InterestLifetime is equivalent to this InterestLifetime.
-   *
-   * Two InterestLifetimes are equivalent if the time values are exactly equal
-   */
-  bool Equals (const Ptr<CCNxPerHopHeaderEntry> other) const;
-
-  /**
-   * Determines if the given InterestLifetime is equivalent to this InterestLifetime.
-   *
-   * Two InterestLifetimes are equivalent if time values are exactly equal
-   */
-  bool Equals (CCNxPerHopHeaderEntry const &other) const;
-
-  /**
-   * Get the number of MACs in this PacketMAC
-   */
-  size_t GetMACCount () const;
-
-  /**
-   * Retrieve the i-th MAC list from this packet.
-   */
-  Ptr<CCNxMACList> GetMACList (size_t i) const;
-
-  /**
-   * Append a new MAC list to this packet.
-   */
-  void AppendMACList (Ptr<CCNxMACList> macList);
-
-  /**
-   * Drop the i-th MAC from this packet.
-   */
-  void DropMACList (size_t i);
-
-  /**
-   * Retrieve the vector of MACs in this entry.
-   */
-  std::vector<Ptr<CCNxMACList> > GetMACs (void) const;
-
-  /**
-   * Prints a string like this:
-   *
-   * { Interest Lifetime timeValue T }
-   *
-   * Where T is the uint64_t value of the CCNxTime.
-   *
-   * @param [in] os ostream object
-   * @return ostream object
-   */
-
-   virtual std::ostream & Print(std::ostream &os) const;
-
-protected:
-
-  static const uint32_t m_packetMACTLVType;
-  std::vector<Ptr<CCNxMACList> > m_packetMACs;
-};
-
-}
+TypeId
+CCNxRouterTags::GetTypeId (void)
+{
+  static TypeId tid = TypeId ("ns3::ccnx::CCNxRouterTags")
+    .SetParent<CCNxPerHopHeaderEntry> ()
+    .SetGroupName ("CCNx");
+  return tid;
 }
 
-#endif // CCNS3_CCNxPacketMAC_H
+TypeId
+CCNxRouterTags::GetInstanceTypeId (void) const
+{
+  return GetTypeId ();
+}
+
+CCNxRouterTags :: CCNxRouterTags ()
+{
+}
+
+CCNxRouterTags::~CCNxRouterTags ()
+{
+  // empty
+}
+
+uint16_t
+CCNxRouterTags :: GetTLVType(void)
+{
+  return m_routerTagTLVType;
+}
+
+uint16_t
+CCNxRouterTags :: GetInstanceTLVType (void) const
+{
+  return GetTLVType ();
+}
+
+std::vector<int>
+CCNxRouterTags :: GetTags () const
+{
+    return m_tags;
+}
+
+void
+CCNxRouterTags :: AppendTag (int tag)
+{
+    m_tags.push_back(tag);
+}
+
+void
+CCNxRouterTags :: DropTag ()
+{
+    m_tags.erase(m_tags.begin());
+}
+
+bool
+CCNxRouterTags::Equals (const Ptr<CCNxPerHopHeaderEntry> other) const
+{
+  if (other)
+    {
+      return Equals (*other);
+    }
+  else
+    {
+      return false;
+    }
+}
+
+bool
+CCNxRouterTags::Equals (CCNxPerHopHeaderEntry const &other) const
+{
+  bool result = false;
+  const CCNxRouterTags *ptr = dynamic_cast<const CCNxRouterTags *>(&other);
+  if (m_tags == ptr->GetTags())
+  {
+    result = true;
+  }
+  return result;
+}
+
+std::ostream &
+CCNxRouterTags::Print(std::ostream &os) const
+{
+  os << "{ RouterTags {";
+  for (int i = 0; i < m_tags.size(); i++) {
+      os << "[" << m_tags.at(i) << "]";
+  }
+  os << " }";
+  return os;
+}

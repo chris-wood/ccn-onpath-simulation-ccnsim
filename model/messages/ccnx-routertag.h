@@ -53,8 +53,8 @@
  * contact PARC at cipo@parc.com for more information or visit http://www.ccnx.org
  */
 
-#ifndef CCNS3_CCNxPacketMAC_H
-#define CCNS3_CCNxPacketMAC_H
+#ifndef CCNS3_CCNxRouterTag_H
+#define CCNS3_CCNxRouterTag_H
 
 #include "ns3/object.h"
 #include "ns3/ccnx-perhopheaderentry.h"
@@ -64,38 +64,12 @@
 namespace ns3  {
 namespace ccnx {
 
-class CCNxMAC : public Object {
-public:
-    CCNxMAC (int id, Ptr<CCNxBuffer> buffer);
-    virtual ~CCNxMAC ();
-
-    Ptr<CCNxBuffer> GetMAC(void) const;
-    int GetID(void) const;
-private:
-    int m_id;
-    Ptr<CCNxBuffer> m_bytes;
-};
-
-class CCNxMACList : public Object {
-public:
-    CCNxMACList ();
-    virtual ~CCNxMACList ();
-
-    void AppendMAC(Ptr<CCNxMAC> mac);
-    void DropMACAtIndex(int index);
-    Ptr<CCNxMAC> GetMACAtIndex(int index) const;
-    int Size() const;
-private:
-    std::vector< Ptr<CCNxMAC> > m_macs;
-};
-
-
 /**
  * @ingroup ccnx-messages
  *
  * Class representation of InterestLifetime Per Hop Header Entry.
  */
-class CCNxPacketMAC : public CCNxPerHopHeaderEntry {
+class CCNxRouterTags : public CCNxPerHopHeaderEntry {
 public:
   static TypeId GetTypeId (void);
 
@@ -105,12 +79,12 @@ public:
    * Constructor for CCNxPacketMAC.
    *
    */
-  CCNxPacketMAC (std::vector< Ptr<CCNxMACList> > macs);
+  CCNxRouterTags ();
 
   /**
    * Destructor for CCNxPacketMAC
    */
-  virtual ~CCNxPacketMAC ();
+  virtual ~CCNxRouterTags ();
 
   /**
    * Returns the Per Hop Header Type ( = 6) for Packet MAC
@@ -118,6 +92,11 @@ public:
   static uint16_t GetTLVType(void);
 
   virtual uint16_t GetInstanceTLVType (void) const;
+
+  // TODO(cawood): add documentation
+  std::vector<int> GetTags () const;
+  void AppendTag (int tag);
+  void DropTag ();
 
   /**
    * Determines if the given InterestLifetime is equivalent to this InterestLifetime.
@@ -134,31 +113,6 @@ public:
   bool Equals (CCNxPerHopHeaderEntry const &other) const;
 
   /**
-   * Get the number of MACs in this PacketMAC
-   */
-  size_t GetMACCount () const;
-
-  /**
-   * Retrieve the i-th MAC list from this packet.
-   */
-  Ptr<CCNxMACList> GetMACList (size_t i) const;
-
-  /**
-   * Append a new MAC list to this packet.
-   */
-  void AppendMACList (Ptr<CCNxMACList> macList);
-
-  /**
-   * Drop the i-th MAC from this packet.
-   */
-  void DropMACList (size_t i);
-
-  /**
-   * Retrieve the vector of MACs in this entry.
-   */
-  std::vector<Ptr<CCNxMACList> > GetMACs (void) const;
-
-  /**
    * Prints a string like this:
    *
    * { Interest Lifetime timeValue T }
@@ -173,11 +127,11 @@ public:
 
 protected:
 
-  static const uint32_t m_packetMACTLVType;
-  std::vector<Ptr<CCNxMACList> > m_packetMACs;
+  static const uint32_t m_routerTagTLVType;
+  std::vector<int> m_tags;
 };
 
 }
 }
 
-#endif // CCNS3_CCNxPacketMAC_H
+#endif //CCNS3_CCNxRouterTag_H

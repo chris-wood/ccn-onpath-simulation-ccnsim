@@ -92,8 +92,14 @@ CCNxStandardPitEntry::isExpired() const
   return isExpired;
 }
 
+std::vector<int>
+CCNxStandardPitEntry::getTags() const
+{
+    return m_downstreamTags;
+}
+
 CCNxPit::Verdict
-CCNxStandardPitEntry::ReceiveInterest (Ptr<CCNxInterest> interest, Ptr<CCNxConnection> ingress, Time expiryTime)
+CCNxStandardPitEntry::ReceiveInterest (Ptr<CCNxInterest> interest, Ptr<CCNxConnection> ingress, Time expiryTime, std::vector<int> downstreamTags)
 {
 
   /*
@@ -116,6 +122,11 @@ CCNxStandardPitEntry::ReceiveInterest (Ptr<CCNxInterest> interest, Ptr<CCNxConne
 
   // Implement the Interest Aggregation strategy.  The default behavior is to forward.
   enum CCNxPit::Verdict verdict = CCNxPit::Forward;
+
+  // Save the downstream tags
+  m_downstreamTags = downstreamTags;
+
+  // TODO(cawood): this will break with aggregation -- we need to prevent that or disable it entirely
 
   /*
    * If the reverse route set is empty, forward the interest.

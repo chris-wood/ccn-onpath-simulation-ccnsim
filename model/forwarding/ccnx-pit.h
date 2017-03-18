@@ -160,7 +160,7 @@ public:
    * @param Ptr<CCNxForwarderMessage> The forwarder message being routed
    * @param Ptr<CCNxConnectionList> The set of connections to forward the Content Object on (may be empty)
    */
-  typedef Callback<void, Ptr<CCNxForwarderMessage>, Ptr<CCNxConnectionList> > SatisfyInterestCallback;
+  typedef Callback<void, Ptr<CCNxForwarderMessage>, Ptr<CCNxConnectionList>, std::vector<int> > SatisfyInterestCallback;
 
   /**
    * Configure the callback for `SatisfyInterest()`.  This must be set before using the PIT table.

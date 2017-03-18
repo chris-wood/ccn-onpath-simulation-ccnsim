@@ -110,12 +110,13 @@ public:
   * @param interest [in] Pointer to CCNxInterest object
   * @param ingress [in] source of this packet
   * @param expiryTime [in] The time at which this particular Interest expires
+  * @param downstreamTags [in] Tags (IDs) of downstream routers
   *
   * @return Verdict::Forward - forward this packet (using next hop from fib)
   * @return Verdict::Aggregrate - do not forward
   * @return Verdict::Error - something has gone badly wrong - should probably assert
   */
-  virtual CCNxPit::Verdict ReceiveInterest (Ptr<CCNxInterest> interest, Ptr<CCNxConnection> ingress, Time expiryTime);
+  virtual CCNxPit::Verdict ReceiveInterest (Ptr<CCNxInterest> interest, Ptr<CCNxConnection> ingress, Time expiryTime, std::vector<int> downstreamTags);
 
   /**
   * SatisfyInterest - Will satisfy all reverse routes, except its ingress connection
@@ -144,6 +145,8 @@ public:
    */
   bool isExpired() const;
 
+  std::vector<int> getTags() const;
+
   /*
    *  Two methods to display this pit entry
    */
@@ -157,6 +160,11 @@ private:
    * The set of reverse routes, may be empty
    */
   ReverseRouteType m_reverseRoutes;
+
+  /**
+   * Downstream router tags
+   */
+  std::vector<int> m_downstreamTags;
 
   /**
    * The interest expiry time is the time at which this PIT entry expires.

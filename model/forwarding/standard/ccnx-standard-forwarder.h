@@ -364,7 +364,7 @@ private:
    * @param message [in] The forwarder message being routed (CCNxStandardForwarderWorkItem)
    * @param egressConnections [in] The egress connections to forward the ContentObject on (may be empty)
    */
-  void PitSatisfyInterestCallback (Ptr<CCNxForwarderMessage> message, Ptr<CCNxConnectionList> egressConnections);
+  void PitSatisfyInterestCallback (Ptr<CCNxForwarderMessage> message, Ptr<CCNxConnectionList> egressConnections, std::vector<int> downstreamTags);
 
   /**
    * Asynchronous callback from the FIB after servicing a SatisfyInterest call.

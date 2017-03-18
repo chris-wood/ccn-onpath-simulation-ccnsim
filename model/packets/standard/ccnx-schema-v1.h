@@ -76,6 +76,7 @@ public:
   static const uint16_t T_CACHE_TIME = 0x0002;
   static const uint16_t T_MSG_HASH = 0x0003;
   static const uint16_t T_PACKET_MAC = 0x0004;
+  static const uint16_t T_ROUTER_TAG = 0x0005;
 
   // top-level TLVs
   static const uint16_t T_INTEREST = 0x0001;

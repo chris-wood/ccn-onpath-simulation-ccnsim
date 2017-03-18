@@ -59,6 +59,7 @@
 #include "ns3/ccnx-l3-protocol.h"
 
 #include <model/messages/ccnx-packetmac.h>
+#include <model/messages/ccnx-routertag.h>
 #include <model/messages/ccnx-buffer.h>
 #include <model/packets/ccnx-packet.h>
 #include <model/packets/standard/ccnx-schema-v1.h>
@@ -78,44 +79,108 @@ NullRouteCallback (Ptr<CCNxPacket>, Ptr<CCNxConnection>, enum CCNxRoutingError::
   NS_ASSERT_MSG (false, "You must set the Route Callback via SetRouteCallback()");
 }
 
-bool
-CCNxForwarder :: ProcessPacketMAC (Ptr<CCNxPacket> packet) const
+void
+CCNxForwarder :: AppendRouterTag(Ptr<CCNxPacket> packet) const
 {
-    // extract the PacketMAC in the per-hop-header
     Ptr<CCNxPerHopHeader> header = packet->GetPerhopHeaders();
+    std::cout << "Number of headers: " << header->size() << std::endl;
 
-    // pull out the PacketMACs
+    // Try to append to the running list, if it's there...
     for (size_t i = 0; i < header->size(); i++) {
         Ptr<CCNxPerHopHeaderEntry> entry = header->GetHeader(i);
+        if (entry->GetInstanceTLVType() == CCNxSchemaV1::T_ROUTER_TAG) { // GetTLVType
+            Ptr<CCNxRouterTags> tagBag = entry->GetObject<CCNxRouterTags>();
 
-        if (entry->GetInstanceTLVType() == CCNxSchemaV1::T_PACKET_MAC) {
-            // GetTLVType
+            // Don't exceed the radii size
+            if (tagBag->GetTags().size() == m_raddiSize) {
+                tagBag->DropTag();
+            }
+            tagBag->AppendTag(m_id);
+            std::cout << "Appending to existing one" << std::endl;
+
+            return;
+        }
+    }
+
+    std::cout << "creating new per-hop header" << std::endl;
+    // Otherwise, create a new list and add it to the packet
+    Ptr<CCNxRouterTags> tagBag = Create<CCNxRouterTags>();
+    tagBag->AppendTag(m_id);
+    header->AddHeader(tagBag);
+}
+
+bool
+CCNxForwarder :: PreProcessPacketMAC (Ptr<CCNxPacket> packet) const
+{
+    Ptr<CCNxPerHopHeader> header = packet->GetPerhopHeaders();
+    for (size_t i = 0; i < header->size(); i++) {
+        Ptr<CCNxPerHopHeaderEntry> entry = header->GetHeader(i);
+        if (entry->GetInstanceTLVType() == CCNxSchemaV1::T_PACKET_MAC) { // GetTLVType
             Ptr<CCNxPacketMAC> macEntry = entry->GetObject<CCNxPacketMAC>();
+
+            // Try to verify each of the packet MACs
             for (size_t j = 0; j < macEntry->GetMACCount(); j++) {
 
                 // Extract the MAC info from the head of the list
                 Ptr<CCNxMACList> list = macEntry->GetMACList(j);
                 Ptr<CCNxMAC> mac = list->GetMACAtIndex(0);
-                int macID = mac->GetID();
+                int keyId = mac->GetID();
                 Ptr<CCNxBuffer> macBuffer = mac->GetMAC();
 
                 // Attempt to verify it
-                if (false == this->VerifySinglePacketMAC(packet, macID, macBuffer)) {
+                if (!this->VerifySinglePacketMAC(packet, keyId, macBuffer)) {
                     return false;
                 }
 
-                // If the MAC was valid, then drop the first one
+                std::cout << m_id << " verified MAC for " << keyId << std::endl;
+
+                // If the MAC was valid, then drop the first MAC from that list
                 list->DropMACAtIndex(0);
                 if (list->Size() == 0) {
                     macEntry->DropMACList(j);
+                    std::cout << m_id << " dropped MAC list " << std::endl;
                 }
             }
-
-            // XXX: once we get here, we need to compute our own set of packet MACs
         }
     }
 
     return true;
+}
+
+void
+CCNxForwarder :: PostProcessPacketMAC (Ptr<CCNxPacket> packet, std::vector<int> keyIds) const
+{
+    if (keyIds.size() == 0) {
+        abort();
+    }
+
+    // Create a new MAC list for each of the key IDs
+    Ptr<CCNxMACList> macList = Create<CCNxMACList>();
+    for (std::vector<int>::iterator itr = keyIds.begin(); itr != keyIds.end(); itr++) {
+        std::cout << m_id << " created downstream MAC for " << *itr << std::endl;
+        Ptr<CCNxBuffer> macBuffer = this->ComputePacketMAC(packet, *itr);
+        Ptr<CCNxMAC> mac = Create<CCNxMAC>(*itr, macBuffer);
+        macList->AppendMAC(mac);
+    }
+
+    Ptr<CCNxPerHopHeader> header = packet->GetPerhopHeaders();
+    bool added = false;
+    for (size_t i = 0; i < header->size(); i++) {
+        Ptr<CCNxPerHopHeaderEntry> entry = header->GetHeader(i);
+        if (entry->GetInstanceTLVType() == CCNxSchemaV1::T_PACKET_MAC) { // GetTLVType
+            added = true;
+            Ptr<CCNxPacketMAC> macEntry = entry->GetObject<CCNxPacketMAC>();
+            macEntry->AppendMACList(macList);
+        }
+    }
+
+    // If there was no matching entry, then don't add anything...
+    if (!added) {
+        std::vector< Ptr<CCNxMACList> > macListList;
+        macListList.push_back(macList);
+        Ptr<CCNxPacketMAC> macEntry = Create<CCNxPacketMAC>(macListList);
+        header->AddHeader(macEntry);
+    }
 }
 
 static std::string
@@ -182,6 +247,24 @@ CCNxForwarder :: ComputePacketMAC (Ptr<CCNxPacket> packet, int keyId) const
     char *data = (char *) mac.c_str();
     Ptr<CCNxBuffer> buffer = Create<CCNxBuffer>(length, data);
     return buffer;
+}
+
+void
+CCNxForwarder::AddIntegrityKey(int id, SecByteBlock block)
+{
+    m_integrityKeys[id] = block;
+}
+
+void
+CCNxForwarder::SetId(int id)
+{
+    m_id = id;
+}
+
+void
+CCNxForwarder::SetRadiiSize(int size)
+{
+    m_raddiSize = size;
 }
 
 TypeId

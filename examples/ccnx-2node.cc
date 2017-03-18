@@ -74,6 +74,33 @@
 #include "ns3/ccns3Sim-module.h"
 #include "ns3/ccnx-message.h"
 
+#include <cryptopp/asn.h>
+#include <cryptopp/base64.h>
+#include <cryptopp/des.h>
+#include <cryptopp/files.h>
+#include <cryptopp/filters.h>
+#include <cryptopp/hex.h>
+#include <cryptopp/modes.h>
+#include <cryptopp/osrng.h>
+#include <cryptopp/pssr.h>
+#include <cryptopp/pwdbased.h>
+#include <cryptopp/rsa.h>
+#include <cryptopp/sha.h>
+#include <cryptopp/eccrypto.h>
+#include <cryptopp/oids.h>
+#include <cryptopp/dsa.h>
+
+using CryptoPP::Exception;
+using CryptoPP::HMAC;
+using CryptoPP::SHA256;
+using CryptoPP::HexEncoder;
+using CryptoPP::HexDecoder;
+using CryptoPP::StringSink;
+using CryptoPP::StringSource;
+using CryptoPP::HashFilter;
+using CryptoPP::HashVerificationFilter;
+using CryptoPP::SecByteBlock;
+
 using namespace ns3;
 using namespace ns3::ccnx;
 
@@ -94,6 +121,7 @@ CreatePacket (uint32_t size, Ptr<CCNxName> name, CCNxMessage::MessageType msgTyp
       {
         Ptr<CCNxContentObject> content = Create<CCNxContentObject> (name, payload);
         packet = CCNxPacket::CreateFromMessage (content);
+        std::cout << "Creating content object!" << std::endl;
         break;
       }
     case  CCNxMessage::Interest:
@@ -162,54 +190,96 @@ RunSimulation (void)
   Time::SetResolution (Time::MS);
 
   NodeContainer nodes;
-  nodes.Create (2);
+  nodes.Create (4);
 
   PointToPointHelper pointToPoint;
   pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("5Mbps"));
   pointToPoint.SetChannelAttribute ("Delay", StringValue ("2ms"));
 
-  NetDeviceContainer devices;
-  devices = pointToPoint.Install (nodes);
+  NodeContainer n0n1 = NodeContainer (nodes.Get (0), nodes.Get (1));
+  NetDeviceContainer d0d1 = pointToPoint.Install (n0n1);
+  NodeContainer n1n2 = NodeContainer (nodes.Get (1), nodes.Get (2));
+  NetDeviceContainer d1d2 = pointToPoint.Install (n1n2);
+  NodeContainer n2n3 = NodeContainer (nodes.Get (2), nodes.Get (3));
+  NetDeviceContainer d2d3 = pointToPoint.Install (n2n3);
 
   CCNxStackHelper ccnx;
   // Setup a CCNxL3Protocol on all the nodes
 
   ccnx.Install (nodes);
-  ccnx.AddInterfaces (devices);
+  ccnx.AddInterfaces (d0d1);
+  ccnx.AddInterfaces (d1d2);
+  ccnx.AddInterfaces (d2d3);
 
   // Add a route from n1 to n0
   Ptr<Node> node0 = nodes.Get (0);
   Ptr<Node> node1 = nodes.Get (1);
+  Ptr<Node> node2 = nodes.Get (2);
+  Ptr<Node> node3 = nodes.Get (3);
   Ptr<NetDevice> node0If0 = node0->GetDevice (0);
   Ptr<NetDevice> node1If0 = node1->GetDevice (0);
+  Ptr<NetDevice> node2If0 = node2->GetDevice (0);
+  Ptr<NetDevice> node3If0 = node3->GetDevice (0);
 
   Ptr<CCNxL3Protocol> node0_ccnx = node0->GetObject<CCNxL3Protocol> ();
   Ptr<CCNxL3Protocol> node1_ccnx = node1->GetObject<CCNxL3Protocol> ();
+  Ptr<CCNxL3Protocol> node2_ccnx = node2->GetObject<CCNxL3Protocol> ();
+  Ptr<CCNxL3Protocol> node3_ccnx = node3->GetObject<CCNxL3Protocol> ();
+
+  Ptr<CCNxName> prefixName = Create<CCNxName> (prefixString);
 
   // Tell the forwarder on node 1 that node0 if0's MAC address is reachable via node1 if 0.
   // We need to create the neighbor adjacency on node1 so we can then add a route
   // via that adjacency next.
   Ptr<CCNxConnectionDevice> node1ToNode0Connection = node1_ccnx->AddNeighbor (node0If0->GetAddress (), node1If0);
-
-  Ptr<CCNxName> prefixName = Create<CCNxName> (prefixString);
-
   node1_ccnx->GetForwarder ()->AddRoute (node1ToNode0Connection, prefixName);
+
+  Ptr<CCNxConnectionDevice> node2ToNode1Connection = node2_ccnx->AddNeighbor (node1If0->GetAddress (), node2If0);
+  node2_ccnx->GetForwarder ()->AddRoute (node2ToNode1Connection, prefixName);
+
+  Ptr<CCNxConnectionDevice> node3ToNode2Connection = node3_ccnx->AddNeighbor (node2If0->GetAddress (), node3If0);
+  node3_ccnx->GetForwarder ()->AddRoute (node3ToNode2Connection, prefixName);
 
   //////
   // key establishment
 
-  // Generate the shared keys
+  // Generate the shared keys [XXX: we're just using the same fixed key here to make things easy, to start]
   CryptoPP::AutoSeededRandomPool prng;
   CryptoPP::SecByteBlock key(16);
   prng.GenerateBlock(key, key.size());
 
-  // Add the keys to the forwarders
+  // Extract the forwarders
   Ptr<CCNxForwarder> f0 = node0_ccnx->GetForwarder();
-  f0->m_integrityKeys[1] = key;
-  f0->m_integrityKeys[0] = key;
   Ptr<CCNxForwarder> f1 = node1_ccnx->GetForwarder();
+  Ptr<CCNxForwarder> f2 = node2_ccnx->GetForwarder();
+  Ptr<CCNxForwarder> f3 = node3_ccnx->GetForwarder();
+
+  // Set the IDs
+  f0->SetId(0);
+  f1->SetId(1);
+  f2->SetId(2);
+  f3->SetId(3);
+
+  // Set the size(s)
+  f0->SetRadiiSize(2);
+  f1->SetRadiiSize(2);
+  f2->SetRadiiSize(2);
+  f3->SetRadiiSize(2);
+
+  // Install the integrity keys
+  f0->m_integrityKeys[0] = key;
+  f0->m_integrityKeys[1] = key;
+
   f1->m_integrityKeys[1] = key;
   f1->m_integrityKeys[0] = key;
+  f1->m_integrityKeys[2] = key;
+
+  f2->m_integrityKeys[2] = key;
+  f2->m_integrityKeys[1] = key;
+  f2->m_integrityKeys[3] = key;
+
+  f3->m_integrityKeys[3] = key;
+  f3->m_integrityKeys[2] = key;
 
   //// done
 
@@ -224,19 +294,16 @@ RunSimulation (void)
   node0Portal->SetRecvCallback (MakeCallback (&PortalPrinter));
   node0Portal->RegisterPrefix (prefixName);
 
-
-
   // Create a CCNxPortal on the source and have it send Interests
-  Ptr<CCNxPortal> node1Portal = CCNxPortal::CreatePortal (node1, tid);
-  node1Portal->SetRecvCallback (MakeCallback (&PortalPrinter));
+  Ptr<CCNxPortal> node3Portal = CCNxPortal::CreatePortal (node3, tid);
+  node3Portal->SetRecvCallback (MakeCallback (&PortalPrinter));
 
   int pktCnt = 3;
 
-  //run some traffic
-  GenerateTraffic (node1Portal, 500,  CCNxMessage::Interest,pktCnt);
+  // Run some traffic
+  GenerateTraffic (node3Portal, 500,  CCNxMessage::Interest,pktCnt);
 
-
-  // return content
+  // Return content
   Simulator::Schedule (Seconds (0.1), &GenerateTraffic, node0Portal, 1500,  CCNxMessage::ContentObject,pktCnt);
 
   // Run the simulator and execute all the events
