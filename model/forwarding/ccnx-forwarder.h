@@ -267,12 +267,13 @@ public:
   void AppendRouterTag(Ptr<CCNxPacket> packet) const;
   bool PreProcessPacketMAC(Ptr<CCNxPacket> packet) const;
   void PostProcessPacketMAC(Ptr<CCNxPacket> packet, std::vector<int> keyIds) const;
-  Ptr<CCNxBuffer> ComputePacketMAC(Ptr<CCNxPacket> packet, int keyId) const;
-  bool VerifySinglePacketMAC(Ptr<CCNxPacket> packet, int keyId, Ptr<CCNxBuffer> macBuffer) const;
+  std::string ComputePacketMAC(Ptr<CCNxPacket> packet, int keyId) const;
+  bool VerifySinglePacketMAC(Ptr<CCNxPacket> packet, int keyId, std::string macBuffer) const;
 
   void AddIntegrityKey(int id, SecByteBlock block);
   void SetId(int id);
   void SetRadiiSize(int size);
+  void EnableIntegrityCheck(bool enable);
 
   /*
    * Integrity radius keys
@@ -288,6 +289,11 @@ public:
    * Integrity radii size (k)
    */
   int m_raddiSize;
+
+  /**
+   * Flag to control whether integrity protection is enforced
+   */
+   bool m_integrityChecked;
 
 protected:
 

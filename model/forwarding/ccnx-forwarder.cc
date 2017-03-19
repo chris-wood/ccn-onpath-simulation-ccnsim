@@ -83,7 +83,6 @@ void
 CCNxForwarder :: AppendRouterTag(Ptr<CCNxPacket> packet) const
 {
     Ptr<CCNxPerHopHeader> header = packet->GetPerhopHeaders();
-    std::cout << "Number of headers: " << header->size() << std::endl;
 
     // Try to append to the running list, if it's there...
     for (size_t i = 0; i < header->size(); i++) {
@@ -96,13 +95,11 @@ CCNxForwarder :: AppendRouterTag(Ptr<CCNxPacket> packet) const
                 tagBag->DropTag();
             }
             tagBag->AppendTag(m_id);
-            std::cout << "Appending to existing one" << std::endl;
 
             return;
         }
     }
 
-    std::cout << "creating new per-hop header" << std::endl;
     // Otherwise, create a new list and add it to the packet
     Ptr<CCNxRouterTags> tagBag = Create<CCNxRouterTags>();
     tagBag->AppendTag(m_id);
@@ -112,6 +109,10 @@ CCNxForwarder :: AppendRouterTag(Ptr<CCNxPacket> packet) const
 bool
 CCNxForwarder :: PreProcessPacketMAC (Ptr<CCNxPacket> packet) const
 {
+    if (!m_integrityChecked) {
+        return true;
+    }
+
     Ptr<CCNxPerHopHeader> header = packet->GetPerhopHeaders();
     for (size_t i = 0; i < header->size(); i++) {
         Ptr<CCNxPerHopHeaderEntry> entry = header->GetHeader(i);
@@ -125,20 +126,18 @@ CCNxForwarder :: PreProcessPacketMAC (Ptr<CCNxPacket> packet) const
                 Ptr<CCNxMACList> list = macEntry->GetMACList(j);
                 Ptr<CCNxMAC> mac = list->GetMACAtIndex(0);
                 int keyId = mac->GetID();
-                Ptr<CCNxBuffer> macBuffer = mac->GetMAC();
+                std::string macBuffer = mac->GetMAC();
 
                 // Attempt to verify it
                 if (!this->VerifySinglePacketMAC(packet, keyId, macBuffer)) {
+                    NS_LOG_DEBUG("failed verifying the MAC");
                     return false;
                 }
-
-                std::cout << m_id << " verified MAC for " << keyId << std::endl;
 
                 // If the MAC was valid, then drop the first MAC from that list
                 list->DropMACAtIndex(0);
                 if (list->Size() == 0) {
                     macEntry->DropMACList(j);
-                    std::cout << m_id << " dropped MAC list " << std::endl;
                 }
             }
         }
@@ -150,15 +149,18 @@ CCNxForwarder :: PreProcessPacketMAC (Ptr<CCNxPacket> packet) const
 void
 CCNxForwarder :: PostProcessPacketMAC (Ptr<CCNxPacket> packet, std::vector<int> keyIds) const
 {
+    if (!m_integrityChecked) {
+        return;
+    }
+
     if (keyIds.size() == 0) {
-        abort();
+        return; // there's nothing to do here!
     }
 
     // Create a new MAC list for each of the key IDs
     Ptr<CCNxMACList> macList = Create<CCNxMACList>();
     for (std::vector<int>::iterator itr = keyIds.begin(); itr != keyIds.end(); itr++) {
-        std::cout << m_id << " created downstream MAC for " << *itr << std::endl;
-        Ptr<CCNxBuffer> macBuffer = this->ComputePacketMAC(packet, *itr);
+        std::string macBuffer = this->ComputePacketMAC(packet, *itr);
         Ptr<CCNxMAC> mac = Create<CCNxMAC>(*itr, macBuffer);
         macList->AppendMAC(mac);
     }
@@ -194,19 +196,21 @@ packetToString(Ptr<CCNxPacket> packet)
 }
 
 bool
-CCNxForwarder :: VerifySinglePacketMAC (Ptr<CCNxPacket> packet, int keyId, Ptr<CCNxBuffer> macBuffer) const
+CCNxForwarder :: VerifySinglePacketMAC (Ptr<CCNxPacket> packet, int keyId, std::string MAC) const
 {
     if (m_integrityKeys.find(keyId) == m_integrityKeys.end()) {
         return false;
     }
-
-    std::string MAC = macBuffer->Serialize();
 
     SecByteBlock key = m_integrityKeys.find(keyId)->second;
     try {
         HMAC<SHA256> hmac(key, key.size());
         const int flags = HashVerificationFilter::THROW_EXCEPTION | HashVerificationFilter::HASH_AT_END;
         std::string plain = packetToString(packet);
+
+        // std::cout << m_id << " verifying: " << plain << std::endl;
+        // std::cout << m_id << " mac = " << MAC << std::endl;
+
         StringSource(plain + MAC, true,
             new HashVerificationFilter(hmac, NULL, flags)
         );
@@ -220,7 +224,7 @@ CCNxForwarder :: VerifySinglePacketMAC (Ptr<CCNxPacket> packet, int keyId, Ptr<C
     return false;
 }
 
-Ptr<CCNxBuffer>
+std::string
 CCNxForwarder :: ComputePacketMAC (Ptr<CCNxPacket> packet, int keyId) const
 {
     if (m_integrityKeys.find(keyId) == m_integrityKeys.end()) {
@@ -233,20 +237,20 @@ CCNxForwarder :: ComputePacketMAC (Ptr<CCNxPacket> packet, int keyId) const
     try {
         HMAC<SHA256> hmac(key, key.size());
         std::string plain = packetToString(packet);
+
+        // std::cout << m_id << " tagging: " << plain << std::endl;
+
         StringSource ss2(plain, true,
             new HashFilter(hmac,
                 new StringSink(mac)
             )
         );
+        // std::cout << m_id << " mac = " << mac << std::endl;
     } catch (const CryptoPP::Exception& e) {
         return NULL;
     }
 
-    // Wrap the MAC up in a CCNxBuffer
-    int length = mac.size();
-    char *data = (char *) mac.c_str();
-    Ptr<CCNxBuffer> buffer = Create<CCNxBuffer>(length, data);
-    return buffer;
+    return mac;
 }
 
 void
@@ -259,6 +263,12 @@ void
 CCNxForwarder::SetId(int id)
 {
     m_id = id;
+}
+
+void
+CCNxForwarder::EnableIntegrityCheck(bool enable)
+{
+    m_integrityChecked = enable;
 }
 
 void

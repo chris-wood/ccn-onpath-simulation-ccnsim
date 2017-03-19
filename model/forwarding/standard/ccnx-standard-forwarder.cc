@@ -386,7 +386,15 @@ CCNxStandardForwarder::PitSatisfyInterestCallback (Ptr<CCNxForwarderMessage> mes
           if (PreProcessPacketMAC(packet)) {
               NS_LOG_DEBUG("MAC verified correctly -- appending new MACs");
               PostProcessPacketMAC(packet, downstreamIds);
-              FinishRouteLookup (item, egressConnections);
+              int payloadSize = packet->GetMessage()->GetPayloadSize();
+              int numMicroSeconds = payloadSize; // (payloadSize / 150) + 1;
+
+              // If we did an integrity check, simulate sleep
+              if (m_integrityChecked) {
+                  Simulator::Schedule(MicroSeconds(m_raddiSize * numMicroSeconds * 2), &CCNxStandardForwarder::FinishRouteLookup, this, item, egressConnections);
+              } else {
+                  FinishRouteLookup (item, egressConnections);
+              }
           } else {
               NS_LOG_DEBUG("MAC verification failed -- dropping the packet");
           }

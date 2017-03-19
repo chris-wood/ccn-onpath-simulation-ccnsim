@@ -111,6 +111,12 @@ CCNxRouterTags :: GetTags () const
     return m_tags;
 }
 
+int
+CCNxRouterTags :: NumberOfTags () const
+{
+    return m_tags.size();
+}
+
 void
 CCNxRouterTags :: AppendTag (int tag)
 {

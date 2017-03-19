@@ -78,6 +78,10 @@ public:
   static const uint16_t T_PACKET_MAC = 0x0004;
   static const uint16_t T_ROUTER_TAG = 0x0005;
 
+  // packet MAC TLVs
+  static const uint16_t T_PACKET_MAC_LIST = 0x0001;
+  static const uint16_t T_PACKET_MAC_LIST_ENTRY = 0x0002;
+
   // top-level TLVs
   static const uint16_t T_INTEREST = 0x0001;
   static const uint16_t T_OBJECT = 0x0002;

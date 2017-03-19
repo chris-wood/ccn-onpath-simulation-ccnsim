@@ -70,6 +70,11 @@ def build(bld):
     obj.source = 'ccnx-2node.cc'
 
     ####
+    obj = bld.create_ns3_program('ccnx-onpath',
+                                 ['network', 'ccns3Sim', 'applications', 'point-to-point'])
+    obj.source = 'ccnx-onpath.cc'
+
+    ####
     obj = bld.create_ns3_program('ccnx-lossy-link',
                                  ['network', 'ccns3Sim', 'applications', 'point-to-point'])
     obj.source = 'ccnx-lossy-link.cc'

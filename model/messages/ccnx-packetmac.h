@@ -66,14 +66,14 @@ namespace ccnx {
 
 class CCNxMAC : public Object {
 public:
-    CCNxMAC (int id, Ptr<CCNxBuffer> buffer);
+    CCNxMAC (int id, std::string buffer);
     virtual ~CCNxMAC ();
 
-    Ptr<CCNxBuffer> GetMAC(void) const;
+    std::string GetMAC(void) const;
     int GetID(void) const;
 private:
     int m_id;
-    Ptr<CCNxBuffer> m_bytes;
+    std::string m_bytes;
 };
 
 class CCNxMACList : public Object {

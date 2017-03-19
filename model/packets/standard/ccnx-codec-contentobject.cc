@@ -358,6 +358,3 @@ CCNxCodecContentObject::DeserializeSchemaValueToPayloadType (uint8_t type)
     }
   return payloadType;
 }
-
-
-

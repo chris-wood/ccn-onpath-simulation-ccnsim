@@ -183,6 +183,8 @@ def build(bld):
         #'model/packets/standard/ccnx-codec-perhopheader.cc',
         'model/packets/standard/ccnx-codec-interestlifetime.cc',
         'model/packets/standard/ccnx-codec-cachetime.cc',
+        'model/packets/standard/ccnx-codec-routertag.cc',
+        'model/packets/standard/ccnx-codec-packetmac.cc',
         # Portal
         'model/portal/ccnx-portal.cc',
         'model/portal/ccnx-portal-factory.cc',
@@ -318,6 +320,8 @@ def build(bld):
         #'model/packets/standard/ccnx-codec-perhopheader.h',
         'model/packets/standard/ccnx-codec-interestlifetime.h',
         'model/packets/standard/ccnx-codec-cachetime.h',
+        'model/packets/standard/ccnx-codec-routertag.h',
+        'model/packets/standard/ccnx-codec-packetmac.h',
         # Portal
         'model/portal/ccnx-portal.h',
         'model/portal/ccnx-portal-factory.h',

@@ -53,101 +53,122 @@
  * contact PARC at cipo@parc.com for more information or visit http://www.ccnx.org
  */
 
-
-#include "ccnx-buffer.h"
+#include "ns3/log.h"
+#include "ns3/ccnx-tlv.h"
+#include "ns3/ccnx-schema-v1.h"
+#include "ccnx-codec-registry.h"
+#include "ccnx-codec-routertag.h"
 
 using namespace ns3;
 using namespace ns3::ccnx;
 
 
-CCNxBuffer::CCNxBuffer (size_t length)
+NS_LOG_COMPONENT_DEFINE ("CCNxCodecRouterTag");
+
+NS_OBJECT_ENSURE_REGISTERED (CCNxCodecRouterTag);
+
+static bool _registered = false;
+static void
+RegisterCodec()
 {
-  m_data = Buffer (length);
+    if (!_registered) {
+	_registered = true;
+	Ptr<CCNxCodecRouterTag> codec = CreateObject<CCNxCodecRouterTag>();
+	CCNxCodecRegistry::PerHopRegisterCodec(CCNxRouterTags::GetTLVType(), codec);
+    }
 }
 
-CCNxBuffer::CCNxBuffer (size_t length, bool initialize)
+TypeId
+CCNxCodecRouterTag::GetTypeId (void)
 {
-  m_data = Buffer (length, initialize);
+    RegisterCodec();
+    static TypeId tid = TypeId ("ns3::ccnx::CCNxCodecRouterTag")
+    .SetParent<CCNxCodecPerHopHeaderEntry> ()
+    .SetGroupName ("CCNx")
+    .AddConstructor<CCNxCodecRouterTag>();
+    return tid;
 }
 
-CCNxBuffer::CCNxBuffer (size_t length, const char *data)
+TypeId
+CCNxCodecRouterTag::GetInstanceTypeId (void) const
 {
-  m_data = Buffer (0);
-  m_data.AddAtStart (length);
-  Buffer::Iterator i;
-  i = m_data.Begin ();
-  i.Write ((uint8_t *)data, length);
+  return GetTypeId ();
 }
 
-CCNxBuffer::CCNxBuffer (Buffer &data)
+CCNxCodecRouterTag::CCNxCodecRouterTag ()
 {
-  m_data = data;
+  // empty
 }
 
-/**
- * Allocate length bytes at the start of the buffer
- */
+CCNxCodecRouterTag::~CCNxCodecRouterTag ()
+{
+  // empty
+}
+
+Ptr<CCNxPerHopHeaderEntry>
+CCNxCodecRouterTag::Deserialize (Buffer::Iterator *inputIterator, size_t *bytesRead)
+{
+    NS_LOG_FUNCTION (this << &inputIterator);
+    NS_ASSERT_MSG (inputIterator->GetSize () >= CCNxTlv::GetTLSize(), "Need to have at least 4 bytes to read");
+    Buffer::Iterator *iterator = inputIterator;
+
+    uint32_t numBytes = 0;
+    uint16_t type = CCNxTlv::ReadType (*iterator);
+    uint16_t length = CCNxTlv::ReadLength (*iterator);
+    numBytes += CCNxTlv::GetTLSize();
+
+    NS_LOG_DEBUG ("Type " << type << " length " << length << " bytesRead " << numBytes);
+
+    Ptr<CCNxRouterTags> routerTags = Create<CCNxRouterTags>();
+    for (int i = 0; i < length / 4; i++) {
+        uint32_t tag = iterator->ReadNtohU32 ();
+        routerTags->AppendTag(tag);
+    }
+
+    numBytes += length;
+    *bytesRead = numBytes;
+
+    return routerTags;
+}
+
+uint32_t
+CCNxCodecRouterTag::GetSerializedSize (Ptr<CCNxPerHopHeaderEntry> perhopEntry)
+{
+    Ptr<CCNxRouterTags> tags = DynamicCast<CCNxRouterTags, CCNxPerHopHeaderEntry> (perhopEntry);
+    int numTags = tags->NumberOfTags();
+    uint32_t length = CCNxTlv::GetTLSize () + (4 * numTags); // each tag is 4 bytes
+    return length;
+}
+
 void
-CCNxBuffer::AddAtStart (size_t length)
+CCNxCodecRouterTag::Serialize (Ptr<CCNxPerHopHeaderEntry> perhopEntry, Buffer::Iterator *outputIterator)
 {
-  m_data.AddAtStart ((uint32_t) length);
-}
+    NS_LOG_FUNCTION (this << &outputIterator);
 
-const Buffer &
-CCNxBuffer::GetBuffer (void) const
-{
-  return m_data;
-}
+    uint16_t bytes = (uint16_t) GetSerializedSize (perhopEntry);
+    NS_ASSERT_MSG (bytes >= CCNxTlv::GetTLSize(), "Serialized size must be at least 4 bytes");
 
-size_t
-CCNxBuffer::GetSize (void) const
-{
-  return m_data.GetSize ();
-}
+    // -4 because it includes the T_ROUTER_TAG TLV.
+    CCNxTlv::WriteTypeLength (*outputIterator, CCNxSchemaV1::T_ROUTER_TAG, bytes - CCNxTlv::GetTLSize ());
 
-Buffer::Iterator
-CCNxBuffer::Begin ()
-{
-  return m_data.Begin ();
-}
+    Ptr<CCNxRouterTags> tags = DynamicCast<CCNxRouterTags, CCNxPerHopHeaderEntry> (perhopEntry);
+    std::vector<int> theTags = tags->GetTags();
 
-Buffer::Iterator
-CCNxBuffer::End ()
-{
-  return m_data.End ();
-}
-
-std::string
-CCNxBuffer::Serialize() const
-{
-    char *buffer = new char[this->GetSize()];
-    m_data.Serialize((uint8_t *) buffer, this->GetSize());
-    return std::string(buffer);
-}
-
-bool
-CCNxBuffer::Equals (const Ptr<CCNxBuffer> other) const
-{
-  if (other)
-    {
-      return Equals (*other);
+    for (std::vector<int>::iterator itr = theTags.begin(); itr != theTags.end(); itr++) {
+        outputIterator->WriteHtonU32 (*itr);
     }
+}
+
+void
+CCNxCodecRouterTag::Print (Ptr<CCNxPerHopHeaderEntry> perhopEntry, std::ostream &os) const
+{
+  if (perhopEntry)
+  {
+      Ptr<CCNxRouterTags> tags = DynamicCast<CCNxRouterTags, CCNxPerHopHeaderEntry> (perhopEntry);
+      tags->Print(os);
+  }
   else
-    {
-      return false;
-    }
-}
-
-bool
-CCNxBuffer::Equals (CCNxBuffer const &other) const
-{
-  bool result = false;
-  if (GetSize () == other.GetSize ())
-    {
-      const uint8_t *a = m_data.PeekData ();
-      const uint8_t *b = other.m_data.PeekData ();
-
-      result = memcmp (a, b, GetSize ()) == 0;
-    }
-  return result;
+  {
+      os << "\nNo router tags header";
+  }
 }

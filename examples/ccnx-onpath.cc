@@ -160,7 +160,7 @@ GenerateTraffic (Ptr<CCNxPortal> source, uint32_t size, CCNxMessage::MessageType
   if (pktCnt > 1)
     {
       // Every 1/2 second, send a packet by calling GenerateTraffic.
-      Simulator::Schedule (Seconds (0.5), &GenerateTraffic, source, size, msgType,pktCnt - 1);
+      Simulator::Schedule (Seconds (0.5), &GenerateTraffic, source, size, msgType, pktCnt - 1);
     }
   else
     {
@@ -179,60 +179,50 @@ PortalPrinter (Ptr<CCNxPortal> portal)
 }
 
 static void
-RunSimulation (bool enableCheck)
+RunSimulation (int numNodes, int k, bool enableCheck)
 {
   Time::SetResolution (Time::MS);
 
   NodeContainer nodes;
-  nodes.Create (4);
+  nodes.Create (numNodes);
 
   PointToPointHelper pointToPoint;
   pointToPoint.SetDeviceAttribute ("DataRate", StringValue ("5Mbps"));
   pointToPoint.SetChannelAttribute ("Delay", StringValue ("2ms"));
 
-  NodeContainer n0n1 = NodeContainer (nodes.Get (0), nodes.Get (1));
-  NetDeviceContainer d0d1 = pointToPoint.Install (n0n1);
-  NodeContainer n1n2 = NodeContainer (nodes.Get (1), nodes.Get (2));
-  NetDeviceContainer d1d2 = pointToPoint.Install (n1n2);
-  NodeContainer n2n3 = NodeContainer (nodes.Get (2), nodes.Get (3));
-  NetDeviceContainer d2d3 = pointToPoint.Install (n2n3);
+  std::vector<NodeContainer> containers;
+  std::vector<NetDeviceContainer> deviceContainers;
+  for (int i = 0; i < numNodes - 1; i++) {
+      NodeContainer container = NodeContainer (nodes.Get (i), nodes.Get (i + 1));
+      containers.push_back(container);
+
+      NetDeviceContainer dc = pointToPoint.Install (container);
+      deviceContainers.push_back(dc);
+  }
 
   CCNxStackHelper ccnx;
   // Setup a CCNxL3Protocol on all the nodes
 
   ccnx.Install (nodes);
-  ccnx.AddInterfaces (d0d1);
-  ccnx.AddInterfaces (d1d2);
-  ccnx.AddInterfaces (d2d3);
+  for (int i = 0; i < numNodes - 1; i++) {
+    ccnx.AddInterfaces(deviceContainers.at(i));
+  }
 
-  // Add a route from n1 to n0
-  Ptr<Node> node0 = nodes.Get (0);
-  Ptr<Node> node1 = nodes.Get (1);
-  Ptr<Node> node2 = nodes.Get (2);
-  Ptr<Node> node3 = nodes.Get (3);
-  Ptr<NetDevice> node0If0 = node0->GetDevice (0);
-  Ptr<NetDevice> node1If0 = node1->GetDevice (0);
-  Ptr<NetDevice> node2If0 = node2->GetDevice (0);
-  Ptr<NetDevice> node3If0 = node3->GetDevice (0);
-
-  Ptr<CCNxL3Protocol> node0_ccnx = node0->GetObject<CCNxL3Protocol> ();
-  Ptr<CCNxL3Protocol> node1_ccnx = node1->GetObject<CCNxL3Protocol> ();
-  Ptr<CCNxL3Protocol> node2_ccnx = node2->GetObject<CCNxL3Protocol> ();
-  Ptr<CCNxL3Protocol> node3_ccnx = node3->GetObject<CCNxL3Protocol> ();
-
+  // Connect each router on the path
   Ptr<CCNxName> prefixName = Create<CCNxName> (prefixString);
 
-  // Tell the forwarder on node 1 that node0 if0's MAC address is reachable via node1 if 0.
-  // We need to create the neighbor adjacency on node1 so we can then add a route
-  // via that adjacency next.
-  Ptr<CCNxConnectionDevice> node1ToNode0Connection = node1_ccnx->AddNeighbor (node0If0->GetAddress (), node1If0);
-  node1_ccnx->GetForwarder ()->AddRoute (node1ToNode0Connection, prefixName);
+  for (int i = 0; i < numNodes - 1; i++) {
+      Ptr<Node> base = nodes.Get (i);
+      Ptr<NetDevice> baseFace = base->GetDevice(0);
+      Ptr<CCNxL3Protocol> ccnxl3source = base->GetObject<CCNxL3Protocol>();
 
-  Ptr<CCNxConnectionDevice> node2ToNode1Connection = node2_ccnx->AddNeighbor (node1If0->GetAddress (), node2If0);
-  node2_ccnx->GetForwarder ()->AddRoute (node2ToNode1Connection, prefixName);
+      Ptr<Node> dest = nodes.Get (i + 1);
+      Ptr<NetDevice> destFace = dest->GetDevice(0);
+      Ptr<CCNxL3Protocol> ccnxl3dest = dest->GetObject<CCNxL3Protocol>();
 
-  Ptr<CCNxConnectionDevice> node3ToNode2Connection = node3_ccnx->AddNeighbor (node2If0->GetAddress (), node3If0);
-  node3_ccnx->GetForwarder ()->AddRoute (node3ToNode2Connection, prefixName);
+      Ptr<CCNxConnectionDevice> connection = ccnxl3dest->AddNeighbor (baseFace->GetAddress (), destFace);
+      ccnxl3dest->GetForwarder ()->AddRoute (connection, prefixName);
+  }
 
   //////
   // key establishment
@@ -243,47 +233,19 @@ RunSimulation (bool enableCheck)
   prng.GenerateBlock(key, key.size());
 
   // Extract the forwarders
-  Ptr<CCNxForwarder> f0 = node0_ccnx->GetForwarder();
-  Ptr<CCNxForwarder> f1 = node1_ccnx->GetForwarder();
-  Ptr<CCNxForwarder> f2 = node2_ccnx->GetForwarder();
-  Ptr<CCNxForwarder> f3 = node3_ccnx->GetForwarder();
+  for (int i = 0; i < numNodes; i++) {
+      Ptr<Node> node = nodes.Get (i);
+      Ptr<NetDevice> face = node->GetDevice(0);
+      Ptr<CCNxL3Protocol> ccnxl3 = node->GetObject<CCNxL3Protocol>();
+      Ptr<CCNxForwarder> fwd = ccnxl3->GetForwarder();
 
-  // Set integrity checks
-  f0->EnableIntegrityCheck(enableCheck);
-  f1->EnableIntegrityCheck(enableCheck);
-  f2->EnableIntegrityCheck(enableCheck);
-  f3->EnableIntegrityCheck(enableCheck);
-
-  // Set the IDs
-  f0->SetId(0);
-  f1->SetId(1);
-  f2->SetId(2);
-  f3->SetId(3);
-
-  // Set the size(s)
-  f0->SetRadiiSize(2);
-  f1->SetRadiiSize(2);
-  f2->SetRadiiSize(2);
-  f3->SetRadiiSize(2);
-
-  // Install the integrity keys
-  f0->m_integrityKeys[0] = key;
-  f0->m_integrityKeys[1] = key;
-  f0->m_integrityKeys[2] = key;
-
-  f1->m_integrityKeys[1] = key;
-  f1->m_integrityKeys[0] = key;
-  f1->m_integrityKeys[2] = key;
-  f1->m_integrityKeys[3] = key;
-
-  f2->m_integrityKeys[2] = key;
-  f2->m_integrityKeys[1] = key;
-  f2->m_integrityKeys[3] = key;
-  f2->m_integrityKeys[0] = key;
-
-  f3->m_integrityKeys[3] = key;
-  f3->m_integrityKeys[2] = key;
-  f3->m_integrityKeys[1] = key;
+      fwd->EnableIntegrityCheck(enableCheck);
+      fwd->SetId(i);
+      fwd->SetRadiiSize(k);
+      for (int j = 0; j < numNodes; j++) {
+          fwd->m_integrityKeys[j] = key;
+      }
+  }
 
   //// done
 
@@ -292,20 +254,20 @@ RunSimulation (bool enableCheck)
   // Create a CCNxPortal on the sink and have it register a Name
   TypeId tid = TypeId::LookupByName ("ns3::ccnx::CCNxMessagePortalFactory");
 
-  Ptr<CCNxPortal> node0Portal = CCNxPortal::CreatePortal (node0, tid);
+  Ptr<CCNxPortal> node0Portal = CCNxPortal::CreatePortal (nodes.Get(0), tid);
   // the order of these does not matter.  Nothing is going to call the callback until we start
   // the simulator with Simulator::Run().
   node0Portal->SetRecvCallback (MakeCallback (&PortalPrinter));
   node0Portal->RegisterPrefix (prefixName);
 
   // Create a CCNxPortal on the source and have it send Interests
-  Ptr<CCNxPortal> node3Portal = CCNxPortal::CreatePortal (node3, tid);
+  Ptr<CCNxPortal> node3Portal = CCNxPortal::CreatePortal (nodes.Get(numNodes - 1), tid);
   node3Portal->SetRecvCallback (MakeCallback (&PortalPrinter));
 
-  int pktCnt = 3;
+  int pktCnt = 100;
 
   // Run some traffic
-  GenerateTraffic (node3Portal, 500,  CCNxMessage::Interest,pktCnt);
+  GenerateTraffic (node3Portal, 100,  CCNxMessage::Interest,pktCnt);
 
   // Return content
   Simulator::Schedule (Seconds (0.1), &GenerateTraffic, node0Portal, 1500,  CCNxMessage::ContentObject,pktCnt);
@@ -319,13 +281,15 @@ RunSimulation (bool enableCheck)
 int
 main (int argc, char *argv[])
 {
-    // GlobalValue::Bind ("SimulatorImplementationType", StringValue ("ns3::RealtimeSimulatorImpl"));
-
     bool enable = true;
+    int numNodes = 4;
+    int k = 2;
     CommandLine cmd;
     cmd.AddValue ("enableCheck", "Enable integrity checks", enable);
+    cmd.AddValue ("numNodes", "Number of nodes", numNodes);
+    cmd.AddValue ("k", "Radii size", k);
     cmd.Parse (argc, argv);
 
-    RunSimulation (enable);
+    RunSimulation (numNodes, k, enable);
     return 0;
 }

@@ -53,101 +53,57 @@
  * contact PARC at cipo@parc.com for more information or visit http://www.ccnx.org
  */
 
+#ifndef CCNS3SIM_CCNxCodecPacketMAC_H
+#define CCNS3SIM_CCNxCodecPacketMAC_H
 
-#include "ccnx-buffer.h"
+#include "ns3/ccnx-codec-perhopheaderentry.h"
+#include "ns3/ccnx-packetmac.h"
 
-using namespace ns3;
-using namespace ns3::ccnx;
-
-
-CCNxBuffer::CCNxBuffer (size_t length)
-{
-  m_data = Buffer (length);
-}
-
-CCNxBuffer::CCNxBuffer (size_t length, bool initialize)
-{
-  m_data = Buffer (length, initialize);
-}
-
-CCNxBuffer::CCNxBuffer (size_t length, const char *data)
-{
-  m_data = Buffer (0);
-  m_data.AddAtStart (length);
-  Buffer::Iterator i;
-  i = m_data.Begin ();
-  i.Write ((uint8_t *)data, length);
-}
-
-CCNxBuffer::CCNxBuffer (Buffer &data)
-{
-  m_data = data;
-}
-
+namespace ns3 {
+namespace ccnx {
 /**
- * Allocate length bytes at the start of the buffer
+ * @ingroup ccnx-packet
+ *
+ * Codec for reading/writing CCNx Cache time per hop header entry
+ *
  */
-void
-CCNxBuffer::AddAtStart (size_t length)
+class CCNxCodecPacketMAC : public CCNxCodecPerHopHeaderEntry
 {
-  m_data.AddAtStart ((uint32_t) length);
-}
+public:
+  static TypeId GetTypeId (void);
 
-const Buffer &
-CCNxBuffer::GetBuffer (void) const
-{
-  return m_data;
-}
+  virtual TypeId GetInstanceTypeId (void) const;
 
-size_t
-CCNxBuffer::GetSize (void) const
-{
-  return m_data.GetSize ();
-}
+  /**
+   * Constructor for CCNxCodecPacketMAC
+   */
+  CCNxCodecPacketMAC ();
 
-Buffer::Iterator
-CCNxBuffer::Begin ()
-{
-  return m_data.Begin ();
-}
+  /**
+   * Destructor for CCNxCodecPacketMAC
+   */
+  virtual ~CCNxCodecPacketMAC ();
 
-Buffer::Iterator
-CCNxBuffer::End ()
-{
-  return m_data.End ();
-}
+  /**
+    * Deserialize Interest Lifetime TLV
+    */
+   Ptr<CCNxPerHopHeaderEntry> Deserialize (Buffer::Iterator *input, size_t *bytesRead);
 
-std::string
-CCNxBuffer::Serialize() const
-{
-    char *buffer = new char[this->GetSize()];
-    m_data.Serialize((uint8_t *) buffer, this->GetSize());
-    return std::string(buffer);
-}
+   uint32_t GetSerializedSize (Ptr<CCNxPerHopHeaderEntry> perhopEntry);
 
-bool
-CCNxBuffer::Equals (const Ptr<CCNxBuffer> other) const
-{
-  if (other)
-    {
-      return Equals (*other);
-    }
-  else
-    {
-      return false;
-    }
-}
+   void Serialize (Ptr<CCNxPerHopHeaderEntry> perhopEntry, Buffer::Iterator *output);
 
-bool
-CCNxBuffer::Equals (CCNxBuffer const &other) const
-{
-  bool result = false;
-  if (GetSize () == other.GetSize ())
-    {
-      const uint8_t *a = m_data.PeekData ();
-      const uint8_t *b = other.m_data.PeekData ();
+   /**
+    * Display this codec's state to the provided output stream.
+    *
+    * @param [in] perhopEntry The Entry to be printed
+    * @param [in] os The output stream to write to
+    */
+   void Print (Ptr<CCNxPerHopHeaderEntry> perhopEntry, std::ostream &os) const;
+};
 
-      result = memcmp (a, b, GetSize ()) == 0;
-    }
-  return result;
-}
+} // namespace ccnx
+} // namespace ns3
+
+
+#endif //CCNS3SIM_CCNxCodecPacketMAC_H

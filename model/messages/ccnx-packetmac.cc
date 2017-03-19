@@ -71,7 +71,7 @@ const uint32_t CCNxPacketMAC::m_packetMACTLVType = 0x0004;
 
 //// CCNxMAC
 
-CCNxMAC::CCNxMAC (int id, Ptr<CCNxBuffer> buffer)
+CCNxMAC::CCNxMAC (int id, std::string buffer)
 {
     m_id = id;
     m_bytes = buffer;
@@ -88,7 +88,7 @@ CCNxMAC :: GetID(void) const
     return m_id;
 }
 
-Ptr<CCNxBuffer>
+std::string
 CCNxMAC :: GetMAC(void) const
 {
     return m_bytes;

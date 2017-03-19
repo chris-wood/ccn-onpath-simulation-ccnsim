@@ -95,6 +95,7 @@ public:
 
   // TODO(cawood): add documentation
   std::vector<int> GetTags () const;
+  int NumberOfTags () const;
   void AppendTag (int tag);
   void DropTag ();
 
