@@ -391,7 +391,8 @@ CCNxStandardForwarder::PitSatisfyInterestCallback (Ptr<CCNxForwarderMessage> mes
 
               // If we did an integrity check, simulate sleep
               if (m_integrityChecked) {
-                  Simulator::Schedule(MicroSeconds(m_raddiSize * numMicroSeconds * 2), &CCNxStandardForwarder::FinishRouteLookup, this, item, egressConnections);
+                  std::cout << "Sleep time: " << m_raddiSize * numMicroSeconds * 2 << std::endl;
+                  Simulator::Schedule(MilliSeconds(m_raddiSize * numMicroSeconds * 2), &CCNxStandardForwarder::FinishRouteLookup, this, item, egressConnections);
               } else {
                   FinishRouteLookup (item, egressConnections);
               }

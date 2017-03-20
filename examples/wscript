@@ -84,6 +84,11 @@ def build(bld):
                                  ['network', 'ccns3Sim', 'applications', 'point-to-point', 'csma'])
     obj.source = 'ccnx-nfp-routing.cc'
 
+    ####
+    obj = bld.create_ns3_program('ccnx-onpath-routing',
+                                 ['network', 'ccns3Sim', 'applications', 'point-to-point', 'csma'])
+    obj.source = 'ccnx-onpath-routing.cc'
+
 
     ####
     obj = bld.create_ns3_program('ccnx-nfp-routing-12node',
