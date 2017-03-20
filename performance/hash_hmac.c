@@ -30,8 +30,9 @@ main(int argc, char **argv)
 
     // Compute the HMAC
     struct timespec start = timerStart();
+    crypto_generichash(hash, sizeof(hash), message, msgLength, NULL, 0);
     for (int i = 0; i < k; i++) {
-        crypto_auth(mac, message, msgLength, key);
+        crypto_auth(mac, hash, sizeof(hash), key);
     }
     long duration = timerEnd(start);
     printf("%d\n", duration);
