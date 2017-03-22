@@ -64,6 +64,8 @@
 #include <model/packets/ccnx-packet.h>
 #include <model/packets/standard/ccnx-schema-v1.h>
 
+#include <time.h>
+
 using namespace ns3;
 using namespace ns3::ccnx;
 
@@ -107,11 +109,14 @@ CCNxForwarder :: AppendRouterTag(Ptr<CCNxPacket> packet) const
 }
 
 bool
-CCNxForwarder :: PreProcessPacketMAC (Ptr<CCNxPacket> packet) const
+CCNxForwarder :: PreProcessPacketMAC (Ptr<CCNxPacket> packet)
 {
     if (!m_integrityChecked) {
         return true;
     }
+
+    struct timespec start_time;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start_time);
 
     Ptr<CCNxPerHopHeader> header = packet->GetPerhopHeaders();
     for (size_t i = 0; i < header->size(); i++) {
@@ -143,11 +148,17 @@ CCNxForwarder :: PreProcessPacketMAC (Ptr<CCNxPacket> packet) const
         }
     }
 
+    struct timespec end_time;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end_time);
+    long diffInNanos = ((end_time.tv_sec - start_time.tv_sec) * 10000000000L) + (end_time.tv_nsec - start_time.tv_nsec);
+
+    lastProcessedTime = diffInNanos;
+
     return true;
 }
 
 void
-CCNxForwarder :: PostProcessPacketMAC (Ptr<CCNxPacket> packet, std::vector<int> keyIds) const
+CCNxForwarder :: PostProcessPacketMAC (Ptr<CCNxPacket> packet, std::vector<int> keyIds)
 {
     if (!m_integrityChecked) {
         return;
@@ -156,6 +167,9 @@ CCNxForwarder :: PostProcessPacketMAC (Ptr<CCNxPacket> packet, std::vector<int> 
     if (keyIds.size() == 0) {
         return; // there's nothing to do here!
     }
+
+    struct timespec start_time;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start_time);
 
     // Create a new MAC list for each of the key IDs
     Ptr<CCNxMACList> macList = Create<CCNxMACList>();
@@ -183,6 +197,14 @@ CCNxForwarder :: PostProcessPacketMAC (Ptr<CCNxPacket> packet, std::vector<int> 
         Ptr<CCNxPacketMAC> macEntry = Create<CCNxPacketMAC>(macListList);
         header->AddHeader(macEntry);
     }
+
+    struct timespec end_time;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end_time);
+    long diffInNanos = ((end_time.tv_sec - start_time.tv_sec) * 10000000000L) + (end_time.tv_nsec - start_time.tv_nsec);
+
+    lastProcessedTime += diffInNanos;
+
+    packetsProcessed++;
 }
 
 static std::string

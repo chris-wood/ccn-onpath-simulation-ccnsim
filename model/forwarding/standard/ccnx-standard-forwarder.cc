@@ -386,13 +386,16 @@ CCNxStandardForwarder::PitSatisfyInterestCallback (Ptr<CCNxForwarderMessage> mes
           if (PreProcessPacketMAC(packet)) {
               NS_LOG_DEBUG("MAC verified correctly -- appending new MACs");
               PostProcessPacketMAC(packet, downstreamIds);
-              int payloadSize = packet->GetMessage()->GetPayloadSize();
-              int numMicroSeconds = payloadSize; // (payloadSize / 150) + 1;
+
+              //   int payloadSize = packet->GetMessage()->GetPayloadSize();
+              //   int numMicroSeconds = payloadSize; // (payloadSize / 150) + 1;
 
               // If we did an integrity check, simulate sleep
               if (m_integrityChecked) {
-                  std::cout << "Sleep time: " << m_raddiSize * numMicroSeconds * 2 << std::endl;
-                  Simulator::Schedule(MilliSeconds(m_raddiSize * numMicroSeconds * 2), &CCNxStandardForwarder::FinishRouteLookup, this, item, egressConnections);
+                long simulateSleepTime = lastProcessedTime;
+                lastProcessedTime = 0;
+                // std::cout << "Sleep time: " << simulateSleepTime << std::endl;
+                Simulator::Schedule(NanoSeconds(simulateSleepTime), &CCNxStandardForwarder::FinishRouteLookup, this, item, egressConnections);
               } else {
                   FinishRouteLookup (item, egressConnections);
               }

@@ -265,8 +265,8 @@ public:
 
   // TODO(cawood): add documentation
   void AppendRouterTag(Ptr<CCNxPacket> packet) const;
-  bool PreProcessPacketMAC(Ptr<CCNxPacket> packet) const;
-  void PostProcessPacketMAC(Ptr<CCNxPacket> packet, std::vector<int> keyIds) const;
+  bool PreProcessPacketMAC(Ptr<CCNxPacket> packet);
+  void PostProcessPacketMAC(Ptr<CCNxPacket> packet, std::vector<int> keyIds);
   std::string ComputePacketMAC(Ptr<CCNxPacket> packet, int keyId) const;
   bool VerifySinglePacketMAC(Ptr<CCNxPacket> packet, int keyId, std::string macBuffer) const;
 
@@ -293,7 +293,14 @@ public:
   /**
    * Flag to control whether integrity protection is enforced
    */
-   bool m_integrityChecked;
+  bool m_integrityChecked;
+
+  /**
+   * Packet processing statistics
+   */
+  long processingTime;
+  int packetsProcessed;
+  long lastProcessedTime;
 
 protected:
 

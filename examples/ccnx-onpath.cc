@@ -139,23 +139,25 @@ CreatePacket (uint32_t size, Ptr<CCNxName> name, CCNxMessage::MessageType msgTyp
       }
     }
   return packet;
-
-
 }
 
+static std::vector<long> put_times;
+static std::vector<long> get_times;
 
 static void
 GenerateTraffic (Ptr<CCNxPortal> source, uint32_t size, CCNxMessage::MessageType msgType,int pktCnt = 1)
 {
-  std::cout << "Packet Send    at=" << Simulator::Now().GetMicroSeconds() << "us, tx bytes=" << size << std::endl;
-
-  //uniquify content name in case there is a content store
+  // uniquify content name in case there is a content store
   std::ostringstream itoa; itoa << pktCnt;
   std::string nameString = contentString + itoa.str();
   Ptr<CCNxName> newname = Create<CCNxName> (nameString);
   Ptr<CCNxPacket> packet = CreatePacket (size, newname, msgType);
-  source->Send (packet);
 
+  if (msgType == CCNxMessage::Interest) {
+    put_times.push_back(Simulator::Now().GetMicroSeconds());
+  }
+
+  source->Send (packet);
 
   if (pktCnt > 1)
     {
@@ -174,14 +176,19 @@ PortalPrinter (Ptr<CCNxPortal> portal)
   Ptr<CCNxPacket> packet;
   while ((packet = portal->Recv ()))
     {
-      std::cout << "Client Rx at=" << Simulator::Now ().GetMicroSeconds () << "us, name=" << *packet->GetMessage ()->GetName () << ", pkt type=" << (packet->GetMessage ()->GetMessageType () ? "Content" : "Interest") << std::endl;
+    //   std::cout << Simulator::Now ().GetMicroSeconds () << std::endl;
+      if (packet->GetMessage ()->GetMessageType () == CCNxMessage::ContentObject) {
+        get_times.push_back(Simulator::Now().GetMicroSeconds());
+        long index = get_times.size() - 1;
+        std::cout << (get_times.at(index) - put_times.at(index)) << std::endl;
+      }
     }
 }
 
 static void
 RunSimulation (int numNodes, int k, bool enableCheck)
 {
-  Time::SetResolution (Time::MS);
+  Time::SetResolution (Time::NS);
 
   NodeContainer nodes;
   nodes.Create (numNodes);
@@ -275,14 +282,13 @@ RunSimulation (int numNodes, int k, bool enableCheck)
   // Run the simulator and execute all the events
   Simulator::Run ();
   Simulator::Destroy ();
-
 }
 
 int
 main (int argc, char *argv[])
 {
     bool enable = true;
-    int numNodes = 4;
+    int numNodes = 3;
     int k = 2;
     CommandLine cmd;
     cmd.AddValue ("enableCheck", "Enable integrity checks", enable);
